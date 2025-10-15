@@ -1,0 +1,10 @@
+#!/bin/zsh
+# Neovide launcher - Opens Neovide GUI with current directory or specified path
+
+if [ $# -eq 0 ]; then
+  # No arguments: open current directory
+  /Applications/Neovide.app/Contents/MacOS/neovide .
+else
+  # With arguments: pass them to neovide
+  /Applications/Neovide.app/Contents/MacOS/neovide "$@"
+fi
