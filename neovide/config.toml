@@ -1,0 +1,10 @@
+# Neovide 配置文件
+# https://neovide.dev/configuration.html
+
+# 窗口框架设置 (macOS)
+frame = "buttonless"  # 隐藏窗口控制按钮
+title-hidden = true   # 隐藏标题文字 (macOS 专用)
+
+# 窗口大小设置
+maximized = true      # 启动时最大化（类似 macOS Fill 效果）
+fullscreen = false    # 启动时不全屏
