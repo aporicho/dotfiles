@@ -1,0 +1,21 @@
+# 开发环境会话
+
+# 设置全局布局
+layout splits
+
+# === 标签 1: 主开发 ===
+new_tab 开发
+cd ~/projects
+launch zsh
+launch --location=vsplit zsh
+launch --location=hsplit zsh
+
+# === 标签 2: 服务器 ===
+new_tab 服务器
+cd ~/
+launch zsh
+
+# === 标签 3: 监控 ===
+new_tab 监控
+cd ~/
+launch htop

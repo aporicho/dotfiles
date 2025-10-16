@@ -1,10 +1,14 @@
 #!/bin/zsh
-# Neovide launcher - Opens Neovide GUI with current directory or specified path
+# Neovide launcher - Opens Neovide GUI independently from terminal
+# Using macOS 'open' command to detach from terminal session
 
 if [ $# -eq 0 ]; then
   # No arguments: open current directory
-  /Applications/Neovide.app/Contents/MacOS/neovide .
+  # -n: Open a new instance even if one is already running
+  # -a: Specify the application name
+  # --args: Pass arguments to the application
+  open -na Neovide --args "$(pwd)"
 else
   # With arguments: pass them to neovide
-  /Applications/Neovide.app/Contents/MacOS/neovide "$@"
+  open -na Neovide --args "$@"
 fi

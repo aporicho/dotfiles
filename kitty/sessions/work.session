@@ -1,0 +1,18 @@
+# 工作环境会话
+
+layout tall
+
+# === 标签 1: 终端 ===
+new_tab 终端
+cd ~/Documents
+launch zsh
+
+# === 标签 2: 日志 ===
+new_tab 日志
+cd /var/log
+launch zsh
+
+# === 标签 3: 笔记 ===
+new_tab 笔记
+cd ~/Notes
+launch zsh

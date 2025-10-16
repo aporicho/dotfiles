@@ -15,9 +15,9 @@ end, { desc = "Toggle Explorer" })
 -- 终端快捷键配置
 -- ============================================
 
--- 删除默认的 Ctrl-/ 映射
-vim.keymap.del("n", "<C-/>")
-vim.keymap.del("t", "<C-/>")
+-- 安全删除默认的 Ctrl-/ 映射（如果存在）
+pcall(vim.keymap.del, "n", "<C-/>")
+pcall(vim.keymap.del, "t", "<C-/>")
 
 -- 使用 Command-/ 切换浮动终端（所有模式）
 vim.keymap.set({ "n", "i", "v", "t" }, "<D-/>", function()
