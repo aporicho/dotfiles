@@ -10,6 +10,43 @@
 - 📁 **会话管理** - 预设开发/工作环境布局
 - 🔧 **模块化配置** - 功能分离，易于维护
 
+---
+
+## ⚙️ 工作原理
+
+### 模块化加载机制
+
+```
+Kitty 启动
+    ↓
+读取 ~/.config/kitty/kitty.conf（主配置）
+    ↓
+kitty.conf 使用 include 指令按顺序加载：
+    1. themes/style.conf        # 通用样式（字体、窗口）
+       ├→ tokyo-night-colors.conf  # Tokyo Night 配色
+    2. performance.conf         # 性能优化
+    3. layouts.conf            # 布局管理
+    4. keymaps.conf            # 快捷键映射
+    5. shell_integration.conf   # Shell 集成
+    6. modern_features.conf    # 现代功能
+    ↓
+所有模块配置合并生效
+```
+
+### 设计理念
+
+**为什么模块化？**
+- ✅ 功能分离：每个配置文件职责单一，易于查找和修改
+- ✅ 可维护性：修改某个功能不影响其他配置
+- ✅ 可复用性：可以单独使用某些模块（如主题）
+
+**配置加载顺序**
+1. 样式优先：字体、窗口、主题先加载，确保视觉正确
+2. 性能其次：性能优化早加载，提升整体体验
+3. 功能最后：布局、快捷键、集成功能后加载
+
+---
+
 ## 📁 目录结构
 
 ```
@@ -369,3 +406,7 @@ echo $TERM  # 应该输出: xterm-kitty
 ---
 
 享受你的 Kitty 终端配置！
+
+---
+
+[← 返回主 README](../README.md)
