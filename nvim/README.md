@@ -23,9 +23,9 @@ LazyVim 启动
     ↓
 settings.lua 执行：
     1. 扫描 ~/dotfiles/nvim/lua/config/*.lua
-       → 加载配置覆盖（keymaps.lua、options.lua）
+       → 加载配置覆盖（keymaps.lua、options.lua、autocmds.lua）
     2. 扫描 ~/dotfiles/nvim/lua/plugins/*.lua
-       → 加载插件规范（tokyonight.lua、autoread.lua）
+       → 加载插件规范（tokyonight.lua、autoread.lua、snacks-explorer.lua）
     ↓
 所有配置叠加到 LazyVim 之上
 ```
@@ -52,10 +52,12 @@ nvim/
 └── lua/
     ├── config/          # 配置覆盖（LazyVim config/）
     │   ├── keymaps.lua  # 自定义快捷键
-    │   └── options.lua  # Neovide GUI 配置
+    │   ├── options.lua  # 通用选项 + Neovide GUI 配置
+    │   └── autocmds.lua # 自动命令（禁用拼写检查、markdown 缩进线）
     └── plugins/         # 自定义插件（LazyVim plugins/）
-        ├── tokyonight.lua  # Tokyo Night 主题
-        └── autoread.lua    # 文件自动刷新
+        ├── tokyonight.lua      # Tokyo Night 主题
+        ├── autoread.lua        # 文件自动刷新
+        └── snacks-explorer.lua # Snacks 文件浏览器 + 状态列配置
 ```
 
 ---
@@ -73,8 +75,18 @@ nvim/
 | `Cmd+/` | 切换浮动终端 | 继承当前目录 |
 | `Cmd+T` | 切换右侧终端 | 占屏幕 40% 宽度 |
 
+### 🛠️ 通用选项
+- **拼写检查**：默认关闭（含禁用 LazyVim 的 markdown 自动拼写）
+- **行号**：默认关闭（number + relativenumber）
+- **符号列**：auto（有符号时才显示）
+- **状态列**：禁用 Snacks 自定义状态列，减少左边距
+- **缩进指引线**：markdown 文件中禁用
+
+### 📁 文件浏览器（Snacks Explorer）
+- **宽度**：20（默认 40）
+
 ### 🖥️ Neovide 配置
-- **字体**：JetBrainsMono Nerd Font Mono (18pt)
+- **字体**：JetBrainsMono Nerd Font Mono (16pt)
 - **光标特效**：Ripple（涟漪效果）
 - **性能**：60fps 刷新率，空闲时 5fps
 - **输入**：Option 键作为 Meta，支持输入法
@@ -129,6 +141,7 @@ LazyVim 会自动：
 - `dotfiles-config-loader` - 配置加载器
 - `tokyonight.nvim` - Tokyo Night 主题
 - `autoread-config` - 自动刷新插件
+- `snacks.nvim` - 文件浏览器 + 状态列配置
 
 ---
 

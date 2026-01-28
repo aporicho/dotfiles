@@ -309,8 +309,7 @@ font_size 18.0          # 调整字体大小
 - **窗口装饰**：`titlebar-only`（隐藏标题栏，保留圆角）
 - **窗口内边距**：8px
 - **边框宽度**：1pt
-- **标签栏位置**：顶部
-- **标签栏样式**：Powerline 圆角
+- **标签栏**：隐藏（tab_bar_style hidden）
 
 ### 光标样式
 
@@ -388,6 +387,9 @@ echo $TERM  # 应该输出: xterm-kitty
 - [Kitty Kittens](https://sw.kovidgoyal.net/kitty/kittens/)
 
 ## 🔄 更新日志
+
+### 2026-01-29 - 样式调整
+- ✅ 隐藏标签栏（tab_bar_style hidden）
 
 ### 2025-10-16 - 集成到 dotfiles
 - ✅ 迁移到模块化 dotfiles 仓库

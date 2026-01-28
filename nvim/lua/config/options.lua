@@ -3,11 +3,20 @@
 -- Add any additional options here
 
 -- ============================================
+-- 通用选项
+-- ============================================
+vim.opt.spell = false -- 关闭拼写检查
+vim.opt.number = false -- 关闭行号
+vim.opt.relativenumber = false -- 关闭相对行号
+vim.opt.signcolumn = "auto" -- 有符号时才显示符号列
+vim.opt.statuscolumn = "" -- 禁用自定义状态列
+
+-- ============================================
 -- Neovide GUI 配置
 -- ============================================
 if vim.g.neovide then
   -- 字体配置（与 Kitty 一致）
-  vim.o.guifont = "JetBrainsMono Nerd Font Mono:h18"
+  vim.o.guifont = "JetBrainsMono Nerd Font Mono:h16"
 
   -- Neovide 特定设置
   vim.g.neovide_scale_factor = 1.0 -- 缩放因子

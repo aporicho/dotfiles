@@ -135,8 +135,8 @@ dotfiles/
 ├── nvim/              # Neovim 配置（基于 LazyVim）
 │   ├── settings.lua   # 统一加载器（符号链接入口）
 │   └── lua/
-│       ├── config/    # 配置覆盖（keymaps/options）
-│       └── plugins/   # 自定义插件（主题/功能扩展）
+│       ├── config/    # 配置覆盖（keymaps/options/autocmds）
+│       └── plugins/   # 自定义插件（主题/功能扩展/Snacks）
 │
 ├── kitty/             # Kitty 终端配置
 │   ├── kitty.conf     # 主配置（模块加载器）
@@ -182,7 +182,9 @@ nvim
 **配置内容**：
 - **主题**：Tokyo Night (night 变体)
 - **快捷键**：`Cmd+E`（文件浏览器）、`Cmd+/`（浮动终端）、`Cmd+T`（右侧终端）
-- **Neovide**：字体、光标特效、性能优化
+- **Neovide**：字体 (16pt)、光标特效、性能优化
+- **通用选项**：关闭拼写检查、行号、自定义状态列；markdown 禁用缩进线
+- **文件浏览器**：Snacks Explorer 宽度 20
 - **自动刷新**：激进模式文件监测（200ms）
 
 详见 [nvim/README.md](nvim/README.md)
@@ -208,6 +210,7 @@ ln -s ~/dotfiles/kitty ~/.config/kitty
 **配置内容**：
 - **主题**：Tokyo Night - 与 Neovim 统一
 - **性能**：0ms 输入延迟、2ms 重绘延迟
+- **标签栏**：隐藏
 - **快捷键**：macOS 风格 Command 键操作
 - **Shell 集成**：命令跳转、输出复制、目录跟踪
 - **会话管理**：开发/工作环境预设
@@ -388,4 +391,4 @@ git push
 
 ---
 
-**最后更新**：2025-10-17
+**最后更新**：2026-01-29
