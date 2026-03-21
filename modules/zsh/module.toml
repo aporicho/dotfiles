@@ -17,3 +17,8 @@ apt = ["zsh", "fzf"]
 
 [hooks]
 post_install = "echo 'Restart your shell or run: source ~/.zshrc'"
+
+[[secrets]]
+source = "secrets.env"
+encrypted = "secrets.env.age"
+target = "~/.zsh/secrets.env"

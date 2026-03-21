@@ -14,3 +14,6 @@ local/
 
 # dot CLI binary
 dot/dot
+
+# Decrypted secrets (never commit plaintext)
+secrets.env

@@ -59,12 +59,6 @@ if [[ -f ~/.config/kitty/kitty.zsh ]]; then
     source ~/.config/kitty/kitty.zsh
 fi
 export PATH="$HOME/.local/bin:$PATH"
-export GITHUB_PERSONAL_ACCESS_TOKEN="REDACTED_GITHUB_TOKEN"
-
-# >>> claudelike >>>
-export ANTHROPIC_BASE_URL="https://claudelike.online/api"
-export ANTHROPIC_AUTH_TOKEN="REDACTED_ANTHROPIC_TOKEN"
-# <<< claudelike <<<
 
 # bun completions
 [ -s "/Users/aporicho/.bun/_bun" ] && source "/Users/aporicho/.bun/_bun"
@@ -72,45 +66,6 @@ export ANTHROPIC_AUTH_TOKEN="REDACTED_ANTHROPIC_TOKEN"
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
-# >>> gt >>>
-export PATH="$HOME/.local/bin:$PATH"
-__gt_cd() {
-    local tmp="/tmp/gt_lastdir"
-    [ -f "$tmp" ] && cd "$(cat "$tmp")" && rm -f "$tmp"
-}
-gt() {
-    if [ $# -eq 0 ]; then command gt && __gt_cd; else command gt "$@"; fi
-}
-gtc() {
-    if [ $# -eq 0 ]; then command gtc && __gt_cd; else command gtc "$@"; fi
-}
-# <<< gt <<<
-# >>> gt >>>
-export PATH="$HOME/.local/bin:$PATH"
-__gt_cd() {
-    local tmp="/tmp/gt_lastdir"
-    [ -f "$tmp" ] && cd "$(cat "$tmp")" && rm -f "$tmp"
-}
-gt() {
-    if [ $# -eq 0 ]; then command gt && __gt_cd; else command gt "$@"; fi
-}
-gtc() {
-    if [ $# -eq 0 ]; then command gtc && __gt_cd; else command gtc "$@"; fi
-}
-# <<< gt <<<
-# >>> gt >>>
-export PATH="$HOME/.local/bin:$PATH"
-__gt_cd() {
-    local tmp="/tmp/gt_lastdir"
-    [ -f "$tmp" ] && cd "$(cat "$tmp")" && rm -f "$tmp"
-}
-gt() {
-    if [ $# -eq 0 ]; then command gt && __gt_cd; else command gt "$@"; fi
-}
-gtc() {
-    if [ $# -eq 0 ]; then command gtc && __gt_cd; else command gtc "$@"; fi
-}
-# <<< gt <<<
 # >>> gt >>>
 export PATH="$HOME/.local/bin:$PATH"
 __gt_cd() {

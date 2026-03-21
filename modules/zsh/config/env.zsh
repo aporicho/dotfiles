@@ -61,3 +61,6 @@ export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border'
 
 # Dotfiles bin directory (for custom scripts)
 export PATH="$HOME/dotfiles/bin:$PATH"
+
+# Secrets (decrypted by dot pull)
+[ -f ~/.zsh/secrets.env ] && source ~/.zsh/secrets.env
