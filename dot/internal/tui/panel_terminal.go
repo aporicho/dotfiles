@@ -47,6 +47,9 @@ func (t *Terminal) Focused() bool { return t.focused }
 // SetFocus implements Panel.
 func (t *Terminal) SetFocus(f bool) { t.focused = f }
 
+// InputMode reports whether the terminal is currently in command-input mode.
+func (t *Terminal) InputMode() bool { return t.inputMode }
+
 // AppendOutput adds lines to the terminal output history programmatically.
 func (t *Terminal) AppendOutput(text string) {
 	for _, line := range strings.Split(text, "\n") {
