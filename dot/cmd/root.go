@@ -6,11 +6,20 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	"github.com/aporicho/dotfiles/dot/internal/tui"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "dot",
 	Short: "Dotfiles module manager",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		dfPath, err := DotfilesPath()
+		if err != nil {
+			return err
+		}
+		return tui.RunDashboard(dfPath)
+	},
 }
 
 // Execute runs the root command.
