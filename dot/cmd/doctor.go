@@ -49,7 +49,10 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 		for _, link := range rec.Links {
 			target := link.Target
-			expectedSource := filepath.Join(dfPath, link.Source)
+			expectedSource := link.Source
+			if !filepath.IsAbs(expectedSource) {
+				expectedSource = filepath.Join(dfPath, expectedSource)
+			}
 
 			// Check if target exists
 			info, err := os.Lstat(target)
