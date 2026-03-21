@@ -182,3 +182,40 @@ description = "module without links"
 		t.Fatal("expected error for missing links, got nil")
 	}
 }
+
+func TestParseWithSecrets(t *testing.T) {
+	dir := t.TempDir()
+	tomlContent := `
+name = "zsh"
+description = "Zsh config"
+
+[[links]]
+source = ".zshrc"
+target = "~/.zshrc"
+
+[[secrets]]
+source = "secrets.env"
+encrypted = "secrets.env.age"
+target = "~/.zsh/secrets.env"
+`
+	os.WriteFile(filepath.Join(dir, "module.toml"), []byte(tomlContent), 0o644)
+	os.WriteFile(filepath.Join(dir, ".zshrc"), []byte("# zshrc"), 0o644)
+
+	mod, err := Parse(dir)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	if len(mod.Secrets) != 1 {
+		t.Fatalf("expected 1 secret, got %d", len(mod.Secrets))
+	}
+	s := mod.Secrets[0]
+	if s.Source != "secrets.env" {
+		t.Errorf("source = %q, want %q", s.Source, "secrets.env")
+	}
+	if s.Encrypted != "secrets.env.age" {
+		t.Errorf("encrypted = %q, want %q", s.Encrypted, "secrets.env.age")
+	}
+	if s.Target != "~/.zsh/secrets.env" {
+		t.Errorf("target = %q, want %q", s.Target, "~/.zsh/secrets.env")
+	}
+}

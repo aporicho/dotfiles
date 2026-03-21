@@ -35,6 +35,13 @@ type Hooks struct {
 	PostRemove  string `toml:"post_remove"`
 }
 
+// Secret represents an age-encrypted secret file mapping.
+type Secret struct {
+	Source    string `toml:"source"`
+	Encrypted string `toml:"encrypted"`
+	Target    string `toml:"target"`
+}
+
 // Module represents a parsed module.toml configuration.
 type Module struct {
 	Name        string   `toml:"name"`
@@ -43,6 +50,7 @@ type Module struct {
 	Requires    []string `toml:"requires,omitempty"`
 	Exclude     []string `toml:"exclude,omitempty"`
 	Links       []Link   `toml:"links"`
+	Secrets     []Secret `toml:"secrets"`
 	Deps        Deps     `toml:"deps"`
 	Hooks       Hooks    `toml:"hooks"`
 	Dir         string   `toml:"-"`
