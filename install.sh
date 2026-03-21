@@ -1,8 +1,8 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 # ============================================
-# Dotfiles 一键安装脚本
+# Dotfiles 引导安装脚本
 # Usage: curl -fsSL https://raw.githubusercontent.com/aporicho/dotfiles/main/install.sh | bash
 # ============================================
 
@@ -21,134 +21,61 @@ ok()    { echo -e "${GREEN}[OK]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 fail()  { echo -e "${RED}[FAIL]${NC} $1"; exit 1; }
 
-# ============================================
-# 1. 安装 Homebrew
-# ============================================
-install_homebrew() {
-    if command -v brew &>/dev/null; then
-        ok "Homebrew 已安装"
-    else
-        info "安装 Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        # Apple Silicon 需要手动添加 PATH
-        if [[ -f /opt/homebrew/bin/brew ]]; then
-            eval "$(/opt/homebrew/bin/brew shellenv)"
+echo ""
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}  Dotfiles 引导安装${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+
+# 1. 克隆或更新仓库
+if [ -d "$DOTFILES_DIR" ]; then
+    warn "$DOTFILES_DIR 已存在，拉取最新代码..."
+    cd "$DOTFILES_DIR" && git pull
+else
+    info "克隆 dotfiles 仓库..."
+    git clone "$REPO_URL" "$DOTFILES_DIR"
+fi
+ok "dotfiles 就绪: $DOTFILES_DIR"
+
+# 2. 安装 Go（如果没有）
+if ! command -v go &>/dev/null; then
+    info "安装 Go..."
+    if [[ "$(uname)" == "Darwin" ]]; then
+        if ! command -v brew &>/dev/null; then
+            info "先安装 Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            if [[ -f /opt/homebrew/bin/brew ]]; then
+                eval "$(/opt/homebrew/bin/brew shellenv)"
+            fi
         fi
-        ok "Homebrew 安装完成"
-    fi
-}
-
-# ============================================
-# 2. 安装依赖
-# ============================================
-install_deps() {
-    info "安装命令行工具..."
-    brew install neovim starship fzf \
-        zsh-autosuggestions zsh-syntax-highlighting zsh-completions
-
-    info "安装字体..."
-    brew install --cask font-jetbrains-mono-nerd-font
-
-    # 如果有显示器环境，安装 GUI 应用
-    if [[ -n "$DISPLAY" ]] || system_profiler SPDisplaysDataType 2>/dev/null | grep -q "Resolution"; then
-        info "检测到显示环境，安装 GUI 应用..."
-        brew install --cask kitty neovide
+        brew install go
     else
-        warn "未检测到显示环境，跳过 kitty/neovide 安装（可手动执行: brew install --cask kitty neovide）"
+        sudo apt-get update && sudo apt-get install -y golang
     fi
+    ok "Go 安装完成"
+else
+    ok "Go 已安装: $(go version)"
+fi
 
-    ok "依赖安装完成"
-}
+# 3. 构建 dot CLI
+info "构建 dot CLI..."
+mkdir -p "$HOME/bin"
+cd "$DOTFILES_DIR/dot"
+go build -o "$HOME/bin/dot" .
+ok "dot CLI 已构建: $HOME/bin/dot"
 
-# ============================================
-# 3. 克隆 dotfiles
-# ============================================
-clone_dotfiles() {
-    if [[ -d "$DOTFILES_DIR" ]]; then
-        warn "$DOTFILES_DIR 已存在，拉取最新代码..."
-        git -C "$DOTFILES_DIR" pull
-    else
-        info "克隆 dotfiles..."
-        git clone "$REPO_URL" "$DOTFILES_DIR"
-    fi
-    ok "dotfiles 就绪: $DOTFILES_DIR"
-}
+# 4. 确保 ~/bin 在 PATH 中
+if [[ ":$PATH:" != *":$HOME/bin:"* ]]; then
+    export PATH="$HOME/bin:$PATH"
+    warn "已临时添加 ~/bin 到 PATH（安装 zsh 模块后会永久生效）"
+fi
 
-# ============================================
-# 4. 备份已有配置
-# ============================================
-backup() {
-    local target="$1"
-    if [[ -e "$target" && ! -L "$target" ]]; then
-        local backup="${target}.backup.$(date +%Y%m%d%H%M%S)"
-        warn "备份 $target -> $backup"
-        mv "$target" "$backup"
-    elif [[ -L "$target" ]]; then
-        rm -f "$target"
-    fi
-}
+# 5. 使用 dot pull 选择模块
+echo ""
+echo -e "${GREEN}========================================${NC}"
+echo -e "${GREEN}  构建完成！选择要安装的模块${NC}"
+echo -e "${GREEN}========================================${NC}"
+echo ""
 
-# ============================================
-# 5. 创建符号链接
-# ============================================
-setup_links() {
-    info "创建符号链接..."
-    mkdir -p ~/.config
-
-    # Zsh
-    backup ~/.zshrc
-    backup ~/.zsh
-    ln -s "$DOTFILES_DIR/zsh/.zshrc" ~/.zshrc
-    ln -s "$DOTFILES_DIR/zsh/config" ~/.zsh
-    ok "Zsh 配置已链接"
-
-    # Kitty
-    backup ~/.config/kitty
-    ln -s "$DOTFILES_DIR/kitty" ~/.config/kitty
-    ok "Kitty 配置已链接"
-
-    # Neovide
-    backup ~/.config/neovide
-    ln -s "$DOTFILES_DIR/neovide" ~/.config/neovide
-    ok "Neovide 配置已链接"
-
-    # Neovim (LazyVim)
-    if [[ ! -d ~/.config/nvim ]]; then
-        info "安装 LazyVim starter..."
-        git clone https://github.com/LazyVim/starter ~/.config/nvim
-        rm -rf ~/.config/nvim/.git
-    fi
-    backup ~/.config/nvim/lua/plugins/dotfiles.lua
-    ln -s "$DOTFILES_DIR/nvim/settings.lua" ~/.config/nvim/lua/plugins/dotfiles.lua
-    ok "Neovim 配置已链接"
-}
-
-# ============================================
-# 主流程
-# ============================================
-main() {
-    echo ""
-    echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}  Dotfiles 一键安装${NC}"
-    echo -e "${BLUE}========================================${NC}"
-    echo ""
-
-    install_homebrew
-    install_deps
-    clone_dotfiles
-    setup_links
-
-    echo ""
-    echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}  安装完成！${NC}"
-    echo -e "${GREEN}========================================${NC}"
-    echo ""
-    echo "请执行以下命令重新加载配置："
-    echo ""
-    echo -e "  ${YELLOW}source ~/.zshrc${NC}"
-    echo ""
-    echo "或重新打开终端即可生效。"
-    echo ""
-}
-
-main
+cd "$DOTFILES_DIR"
+dot pull
