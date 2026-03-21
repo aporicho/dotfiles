@@ -73,3 +73,19 @@ alias flushdns='sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder'
 # Show/hide desktop icons
 alias hidedesktop='defaults write com.apple.finder CreateDesktop -bool false && killall Finder'
 alias showdesktop='defaults write com.apple.finder CreateDesktop -bool true && killall Finder'
+
+# ============================================
+# Starship 主题切换
+# ============================================
+
+theme-dark() {
+    cp ~/.config/starship-dark.toml ~/.config/starship.toml
+    eval "$(starship init zsh)"
+    echo "已切换到深色主题"
+}
+
+theme-light() {
+    cp ~/.config/starship-light.toml ~/.config/starship.toml
+    eval "$(starship init zsh)"
+    echo "已切换到浅色主题"
+}
