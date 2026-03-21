@@ -17,70 +17,135 @@
 **Files:**
 - Create: `dot/internal/tui/styles.go`
 
-- [ ] **Step 1: Create styles.go with Tokyo Night color constants and lipgloss styles**
+- [ ] **Step 1: Create theme.go using ANSI 0-15 palette (terminal-driven, not hardcoded)**
+
+Follow the pattern from markcli (`/Users/aporicho/Documents/GitHub/markcli/internal/theme/theme.go`): use ANSI color numbers ("0"-"15") so the terminal's color scheme drives all colors. This means the TUI automatically adapts to any terminal theme (Tokyo Night, Nord, Dracula, etc.) without hardcoded hex values.
+
+Create `dot/internal/tui/theme.go`:
 
 ```go
 package tui
 
 import "github.com/charmbracelet/lipgloss"
 
-// Tokyo Night colors
-var (
-	ColorBg        = lipgloss.Color("#0f0f14")
-	ColorPanel     = lipgloss.Color("#1a1b26")
-	ColorHighlight = lipgloss.Color("#1e2030")
-	ColorBorder    = lipgloss.Color("#3b4261")
-	ColorText      = lipgloss.Color("#c0caf5")
-	ColorSubtext   = lipgloss.Color("#565f89")
-	ColorGreen     = lipgloss.Color("#9ece6a")
-	ColorYellow    = lipgloss.Color("#e0af68")
-	ColorRed       = lipgloss.Color("#f7768e")
-	ColorBlue      = lipgloss.Color("#7aa2f7")
-	ColorPurple    = lipgloss.Color("#bb9af7")
-)
+// Theme uses ANSI 0-15 colors so the terminal's palette drives all styling.
+// Users control the look by configuring their terminal theme.
+type Theme struct {
+	Dark bool
+}
 
-// Panel styles
-var (
-	PanelStyle = lipgloss.NewStyle().
-			Background(ColorPanel).
-			BorderForeground(ColorBorder).
-			Border(lipgloss.RoundedBorder())
+// DetectTheme returns a Theme with Dark set based on the terminal background.
+func DetectTheme() Theme {
+	return Theme{Dark: lipgloss.HasDarkBackground()}
+}
 
-	PanelFocusedStyle = lipgloss.NewStyle().
-				Background(ColorPanel).
-				BorderForeground(ColorBlue).
-				Border(lipgloss.RoundedBorder())
+func (t Theme) contrastFg() string {
+	if t.Dark {
+		return "0"
+	}
+	return "15"
+}
 
-	HeaderStyle = lipgloss.NewStyle().
-			Foreground(ColorSubtext).
-			Bold(false).
-			Uppercase(true)
+// --- Semantic colors (ANSI numbers) ---
 
-	ValueStyle   = lipgloss.NewStyle().Foreground(ColorText)
-	GreenStyle   = lipgloss.NewStyle().Foreground(ColorGreen)
-	YellowStyle  = lipgloss.NewStyle().Foreground(ColorYellow)
-	RedStyle     = lipgloss.NewStyle().Foreground(ColorRed)
-	BlueStyle    = lipgloss.NewStyle().Foreground(ColorBlue)
-	PurpleStyle  = lipgloss.NewStyle().Foreground(ColorPurple)
-	SubtextStyle = lipgloss.NewStyle().Foreground(ColorSubtext)
+func (t Theme) Green() string   { return "2" }
+func (t Theme) Yellow() string  { return "3" }
+func (t Theme) Blue() string    { return "4" }
+func (t Theme) Purple() string  { return "5" }
+func (t Theme) Cyan() string    { return "6" }
+func (t Theme) Red() string     { return "1" }
+func (t Theme) Dimmed() string  { return "8" }
+func (t Theme) Subtle() string  { return "7" }
 
-	// Channel Strip chip styles
-	ChipStyle = lipgloss.NewStyle().
+// --- Panel ---
+
+func (t Theme) PanelBorder() string       { return "8" }
+func (t Theme) PanelFocusBorder() string   { return "4" }
+func (t Theme) PanelBg() string {
+	if t.Dark { return "0" }
+	return "15"
+}
+
+// --- Channel Strip ---
+
+func (t Theme) ChipBorder() string        { return "8" }
+func (t Theme) ChipSelectedBorder() string { return "4" }
+
+// --- Status LEDs ---
+
+func (t Theme) LedHealthy() string { return "2" }
+func (t Theme) LedWarning() string { return "3" }
+func (t Theme) LedError() string   { return "1" }
+
+// --- Controls ---
+
+func (t Theme) BtnPull() string   { return "4" }
+func (t Theme) BtnPush() string   { return "5" }
+func (t Theme) BtnDoctor() string { return "2" }
+func (t Theme) BtnRemove() string { return "1" }
+
+// --- Footer ---
+
+func (t Theme) FooterFg() string { return "8" }
+func (t Theme) FooterBg() string { return t.PanelBg() }
+```
+
+Then create `dot/internal/tui/styles.go` with lipgloss helpers that consume the Theme:
+
+```go
+package tui
+
+import "github.com/charmbracelet/lipgloss"
+
+// Styles derived from a Theme. Created once at dashboard startup.
+type Styles struct {
+	Panel        lipgloss.Style
+	PanelFocused lipgloss.Style
+	Header       lipgloss.Style
+	Value        lipgloss.Style
+	Green        lipgloss.Style
+	Yellow       lipgloss.Style
+	Red          lipgloss.Style
+	Blue         lipgloss.Style
+	Purple       lipgloss.Style
+	Dimmed       lipgloss.Style
+	Chip         lipgloss.Style
+	ChipSelected lipgloss.Style
+	Button       lipgloss.Style
+}
+
+// NewStyles creates a Styles set from a Theme.
+func NewStyles(t Theme) Styles {
+	return Styles{
+		Panel: lipgloss.NewStyle().
+			BorderForeground(lipgloss.Color(t.PanelBorder())).
+			Border(lipgloss.RoundedBorder()),
+		PanelFocused: lipgloss.NewStyle().
+			BorderForeground(lipgloss.Color(t.PanelFocusBorder())).
+			Border(lipgloss.RoundedBorder()),
+		Header: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(t.Dimmed())).
+			Uppercase(true),
+		Value:  lipgloss.NewStyle().Foreground(lipgloss.Color(t.Subtle())),
+		Green:  lipgloss.NewStyle().Foreground(lipgloss.Color(t.Green())),
+		Yellow: lipgloss.NewStyle().Foreground(lipgloss.Color(t.Yellow())),
+		Red:    lipgloss.NewStyle().Foreground(lipgloss.Color(t.Red())),
+		Blue:   lipgloss.NewStyle().Foreground(lipgloss.Color(t.Blue())),
+		Purple: lipgloss.NewStyle().Foreground(lipgloss.Color(t.Purple())),
+		Dimmed: lipgloss.NewStyle().Foreground(lipgloss.Color(t.Dimmed())),
+		Chip: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(ColorBorder).
-			Padding(0, 1)
-
-	ChipSelectedStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(ColorBlue).
-				Background(ColorHighlight).
-				Padding(0, 1)
-
-	// Controls button style
-	ButtonStyle = lipgloss.NewStyle().
+			BorderForeground(lipgloss.Color(t.ChipBorder())).
+			Padding(0, 1),
+		ChipSelected: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			Align(lipgloss.Center)
-)
+			BorderForeground(lipgloss.Color(t.ChipSelectedBorder())).
+			Padding(0, 1),
+		Button: lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			Align(lipgloss.Center),
+	}
+}
 ```
 
 - [ ] **Step 2: Verify it compiles**
@@ -90,8 +155,8 @@ Run: `cd dot && go build -o /dev/null .`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add dot/internal/tui/styles.go
-git commit -m "feat(tui): add Tokyo Night theme styles"
+git add dot/internal/tui/theme.go dot/internal/tui/styles.go
+git commit -m "feat(tui): add ANSI palette theme and styles"
 ```
 
 ---
@@ -681,7 +746,7 @@ func (c ChannelStrip) Update(msg tea.Msg) (ChannelStrip, tea.Cmd) {
 func (c ChannelStrip) View(width, _ int) string {
 	var chips []string
 
-	logo := BlueStyle.Bold(true).Render("DOT")
+	logo := s.Blue.Bold(true).Render("DOT")
 	chips = append(chips, logo)
 
 	for i, mod := range c.modules {
@@ -690,14 +755,14 @@ func (c ChannelStrip) View(width, _ int) string {
 		label := name + " " + led
 
 		if !platform.MatchesPlatform(mod.Platforms) {
-			chips = append(chips, SubtextStyle.Render("["+label+"]"))
+			chips = append(chips, s.Dimmed.Render("["+label+"]"))
 			continue
 		}
 
 		if i == c.selected {
-			chips = append(chips, ChipSelectedStyle.Render(label))
+			chips = append(chips, s.ChipSelected.Render(label))
 		} else {
-			chips = append(chips, ChipStyle.Render(label))
+			chips = append(chips, s.Chip.Render(label))
 		}
 	}
 
@@ -724,14 +789,14 @@ func (c ChannelStrip) SelectedIndex() int { return c.selected }
 
 func ledFor(mod *module.Module, mf *manifest.Manifest, gitChanges []string) string {
 	if !mf.IsInstalled(mod.Name) {
-		return RedStyle.Render("●")
+		return s.Red.Render("●")
 	}
 
 	// Check git changes
 	prefix := "modules/" + mod.Name + "/"
 	for _, line := range gitChanges {
 		if len(line) >= 4 && strings.Contains(line[3:], prefix) {
-			label := YellowStyle.Render("●")
+			label := s.Yellow.Render("●")
 			if len(mod.Secrets) > 0 {
 				label += " 🔐"
 			}
@@ -739,7 +804,7 @@ func ledFor(mod *module.Module, mf *manifest.Manifest, gitChanges []string) stri
 		}
 	}
 
-	label := GreenStyle.Render("●")
+	label := s.Green.Render("●")
 	if len(mod.Secrets) > 0 {
 		label += " 🔐"
 	}
