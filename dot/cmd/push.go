@@ -4,12 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	gitpkg "github.com/aporicho/dotfiles/dot/internal/git"
+	"github.com/aporicho/dotfiles/dot/internal/module"
+	"github.com/aporicho/dotfiles/dot/internal/secrets"
+	"github.com/aporicho/dotfiles/dot/internal/tui"
 )
 
 var pushMessage string
@@ -23,6 +27,37 @@ var pushCmd = &cobra.Command{
 func init() {
 	pushCmd.Flags().StringVarP(&pushMessage, "message", "m", "", "Custom commit message")
 	rootCmd.AddCommand(pushCmd)
+}
+
+var cachedPushPassphrase string
+
+func getPushPassphrase(encPath string) (string, error) {
+	if cachedPushPassphrase != "" {
+		return cachedPushPassphrase, nil
+	}
+
+	_, err := os.Stat(encPath)
+	isNew := os.IsNotExist(err)
+
+	var p string
+	if isNew {
+		fmt.Println("  🔐 首次加密，请设置 passphrase")
+		p, err = secrets.GetNewPassphrase(tui.RunPassphraseInput)
+	} else {
+		p, err = secrets.GetPassphrase(tui.RunPassphraseInput)
+	}
+	if err != nil {
+		return "", err
+	}
+
+	cachedPushPassphrase = p
+
+	if isNew && secrets.KeychainAvailable() {
+		secrets.OfferSaveToKeychain(p)
+		fmt.Println("  ✓ 已保存到系统 Keychain")
+	}
+
+	return p, nil
 }
 
 func runPush(cmd *cobra.Command, args []string) error {
@@ -105,9 +140,43 @@ func runPush(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Encrypt secrets if changed
+	allModules, _ := module.LoadAll(filepath.Join(dfPath, "modules"))
+	for _, mod := range allModules {
+		if len(mod.Secrets) == 0 {
+			continue
+		}
+		modDir := mod.Dir
+		for _, sec := range mod.Secrets {
+			plainPath := filepath.Join(modDir, sec.Source)
+			encPath := filepath.Join(modDir, sec.Encrypted)
+
+			if _, err := os.Stat(plainPath); os.IsNotExist(err) {
+				continue
+			}
+
+			passphrase, err := getPushPassphrase(encPath)
+			if err != nil {
+				return fmt.Errorf("getting passphrase: %w", err)
+			}
+
+			changed, err := secrets.HasChanged(plainPath, encPath, passphrase)
+			if err != nil {
+				return fmt.Errorf("checking secrets: %w", err)
+			}
+
+			if changed {
+				fmt.Printf("  🔐 加密 %s → %s\n", sec.Source, sec.Encrypted)
+				if err := secrets.EncryptFile(plainPath, encPath, passphrase); err != nil {
+					return fmt.Errorf("encrypting %s: %w", sec.Source, err)
+				}
+			}
+		}
+	}
+
 	// Step 6: commit and push
 	fmt.Printf("提交：%s\n", msg)
-	if err := gitpkg.AddAndCommit(dfPath, []string{"modules/"}, msg); err != nil {
+	if err := gitpkg.AddAndCommit(dfPath, []string{"modules/", ".gitignore"}, msg); err != nil {
 		return fmt.Errorf("git commit: %w", err)
 	}
 
