@@ -14,11 +14,36 @@ import (
 	"github.com/aporicho/dotfiles/dot/internal/manifest"
 	"github.com/aporicho/dotfiles/dot/internal/module"
 	"github.com/aporicho/dotfiles/dot/internal/platform"
+	"github.com/aporicho/dotfiles/dot/internal/secrets"
 	"github.com/aporicho/dotfiles/dot/internal/sysdep"
 	"github.com/aporicho/dotfiles/dot/internal/tui"
 )
 
 var pullAll bool
+
+var cachedPassphrase string
+
+func getPassphrase() (string, error) {
+	if cachedPassphrase != "" {
+		return cachedPassphrase, nil
+	}
+	if secrets.KeychainAvailable() {
+		if p, _ := secrets.LoadPassphrase(); p != "" {
+			cachedPassphrase = p
+			return p, nil
+		}
+	}
+	// Interactive input with retry (max 3 attempts)
+	for i := 0; i < 3; i++ {
+		p, err := tui.RunPassphraseInput("Passphrase:", false)
+		if err != nil {
+			return "", err
+		}
+		cachedPassphrase = p
+		return p, nil
+	}
+	return "", fmt.Errorf("超过最大重试次数")
+}
 
 var pullCmd = &cobra.Command{
 	Use:   "pull [modules...]",
@@ -208,6 +233,42 @@ func installModule(dfPath string, mod *module.Module, mf *manifest.Manifest) err
 			}
 			createdLinks = append(createdLinks, lr)
 		}
+	}
+
+	// Handle secrets
+	for _, sec := range mod.Secrets {
+		encPath := filepath.Join(modDir, sec.Encrypted)
+		plainPath := filepath.Join(modDir, sec.Source)
+		target := expandHome(sec.Target)
+
+		// Skip if no encrypted file exists
+		if _, err := os.Stat(encPath); os.IsNotExist(err) {
+			continue
+		}
+
+		// Decrypt if plaintext doesn't exist
+		if _, err := os.Stat(plainPath); os.IsNotExist(err) {
+			passphrase, err := getPassphrase()
+			if err != nil {
+				return fmt.Errorf("getting passphrase: %w", err)
+			}
+			fmt.Printf("  🔐 解密 %s\n", sec.Encrypted)
+			if err := secrets.DecryptFile(encPath, plainPath, passphrase); err != nil {
+				return fmt.Errorf("decrypting %s: %w", sec.Encrypted, err)
+			}
+			// Offer to save to keychain
+			if secrets.KeychainAvailable() {
+				secrets.OfferSaveToKeychain(passphrase)
+				fmt.Println("  ✓ 已保存到系统 Keychain")
+			}
+		}
+
+		// Create symlink for secrets — append to createdLinks
+		lr, err := linker.CreateLink(plainPath, target)
+		if err != nil {
+			return fmt.Errorf("linking secret %s: %w", sec.Source, err)
+		}
+		createdLinks = append(createdLinks, lr)
 	}
 
 	// Step 4: post_install hook
