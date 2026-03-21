@@ -11,3 +11,6 @@
 # Local settings (not to be shared)
 local/
 *.local
+
+# dot CLI binary
+dot/dot
