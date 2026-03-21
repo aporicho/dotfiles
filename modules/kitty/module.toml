@@ -1,0 +1,14 @@
+name = "kitty"
+description = "Kitty terminal emulator configuration"
+platforms = ["darwin", "linux"]
+exclude = ["module.toml", "README*"]
+
+[[links]]
+source = "."
+target = "~/.config/kitty"
+
+[deps.darwin]
+brew = ["kitty"]
+
+[deps.linux]
+apt = ["kitty"]

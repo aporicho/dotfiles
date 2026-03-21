@@ -1,0 +1,6 @@
+name = "git"
+description = "Git global configuration"
+
+[[links]]
+source = "ignore"
+target = "~/.config/git/ignore"

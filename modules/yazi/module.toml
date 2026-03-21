@@ -1,0 +1,14 @@
+name = "yazi"
+description = "Yazi file manager configuration"
+platforms = ["darwin", "linux"]
+exclude = ["module.toml", "README*"]
+
+[[links]]
+source = "."
+target = "~/.config/yazi"
+
+[deps.darwin]
+brew = ["yazi"]
+
+[deps.linux]
+apt = ["yazi"]

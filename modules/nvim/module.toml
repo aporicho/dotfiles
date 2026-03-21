@@ -1,0 +1,21 @@
+name = "nvim"
+description = "Neovim configuration injection via LazyVim plugin"
+
+[[links]]
+source = "settings.lua"
+target = "~/.config/nvim/lua/plugins/dotfiles.lua"
+
+[deps.darwin]
+brew = ["neovim"]
+
+[deps.linux]
+apt = ["neovim"]
+
+[hooks]
+pre_install = """
+if [ ! -d ~/.config/nvim ]; then
+  echo 'LazyVim not found. Please install LazyVim first:'
+  echo '  git clone https://github.com/LazyVim/starter ~/.config/nvim'
+  exit 1
+fi
+"""

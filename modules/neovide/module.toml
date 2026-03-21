@@ -1,0 +1,11 @@
+name = "neovide"
+description = "Neovide GUI client configuration"
+platforms = ["darwin", "linux"]
+exclude = ["module.toml", "README*"]
+
+[[links]]
+source = "."
+target = "~/.config/neovide"
+
+[deps.darwin]
+brew = ["neovide"]

@@ -1,0 +1,19 @@
+name = "zsh"
+description = "Zsh shell configuration"
+
+[[links]]
+source = ".zshrc"
+target = "~/.zshrc"
+
+[[links]]
+source = "config"
+target = "~/.zsh"
+
+[deps.darwin]
+brew = ["zsh-autosuggestions", "zsh-syntax-highlighting", "zsh-completions", "starship", "fzf"]
+
+[deps.linux]
+apt = ["zsh", "fzf"]
+
+[hooks]
+post_install = "echo 'Restart your shell or run: source ~/.zshrc'"

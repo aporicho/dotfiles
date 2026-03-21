@@ -1,0 +1,7 @@
+name = "bin"
+description = "Custom executable scripts"
+exclude = ["module.toml", "README*"]
+
+[[links]]
+source = "."
+target = "~/bin"
