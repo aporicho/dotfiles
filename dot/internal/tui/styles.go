@@ -27,10 +27,10 @@ func NewStyles(t Theme) Styles {
 	return Styles{
 		Panel: lipgloss.NewStyle().
 			BorderForeground(lipgloss.Color(t.PanelBorder())).
-			Border(lipgloss.RoundedBorder()),
+			Border(lipgloss.NormalBorder()),
 		PanelFocused: lipgloss.NewStyle().
 			BorderForeground(lipgloss.Color(t.PanelFocusBorder())).
-			Border(lipgloss.RoundedBorder()),
+			Border(lipgloss.NormalBorder()),
 		Header: lipgloss.NewStyle().
 			Foreground(lipgloss.Color(t.Dimmed())).
 			Transform(strings.ToUpper),
@@ -42,15 +42,14 @@ func NewStyles(t Theme) Styles {
 		Purple: lipgloss.NewStyle().Foreground(lipgloss.Color(t.Purple())),
 		Dimmed: lipgloss.NewStyle().Foreground(lipgloss.Color(t.Dimmed())),
 		Chip: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(t.ChipBorder())).
-			Padding(0, 1),
+			Align(lipgloss.Center).
+			Foreground(lipgloss.Color(t.Dimmed())),
 		ChipSelected: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(t.ChipSelectedBorder())).
-			Padding(0, 1),
+			Align(lipgloss.Center).
+			Foreground(lipgloss.Color(t.Blue())).
+			Bold(true),
 		Button: lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(lipgloss.NormalBorder()).
 			Align(lipgloss.Center),
 	}
 }

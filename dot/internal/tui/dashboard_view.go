@@ -1,60 +1,61 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
 
-// View implements tea.Model. Lays out the dashboard panels.
+	"github.com/charmbracelet/lipgloss"
+)
+
+// View implements tea.Model.
 func (d *Dashboard) View() string {
 	if d.width < 80 || d.height < 24 {
 		return "终端过小，请调整窗口大小（至少 80×24）"
 	}
 
-	const (
-		channelHeight  = 3
-		controlsHeight = 3
-		footerHeight   = 1
-	)
+	lay := ComputeLayout(d.width, d.height, len(d.modules))
+	border := lipgloss.NormalBorder()
+	borderSty := lipgloss.NewStyle().Foreground(lipgloss.Color(d.theme.PanelBorder()))
 
-	middleHeight := d.height - channelHeight - controlsHeight - footerHeight
-	if middleHeight < 1 {
-		middleHeight = 1
+	// 1. Channel strip: framed chip grid
+	chipContents := d.channel.ChipContents(lay.ChipW, lay.ChipH)
+	chipWidths := make([]int, len(chipContents))
+	for i := range chipWidths {
+		chipWidths[i] = lay.ChipW
 	}
+	channelFrame := RenderFrame(border, borderSty, chipWidths, chipContents, lay.ChipH)
 
-	overviewWidth := 22
-	remaining := d.width - overviewWidth
-	scopeWidth := remaining / 2
-	terminalWidth := remaining - scopeWidth
+	// 2. Middle panels: framed 3-column layout
+	overviewContent := d.overview.View(lay.Overview.W, lay.PanelInnerH)
+	scopeContent := d.scope.View(lay.Scope.W, lay.PanelInnerH)
+	terminalContent := d.terminal.View(lay.Terminal.W, lay.PanelInnerH)
 
-	// Render each section.
-	channelView := d.channel.View(d.width, channelHeight)
+	panelWidths := []int{lay.Overview.W, lay.Scope.W, lay.Terminal.W}
+	panelContents := []string{overviewContent, scopeContent, terminalContent}
+	panelFrame := RenderFrame(border, borderSty, panelWidths, panelContents, lay.PanelInnerH)
 
-	overviewView := d.overview.View(overviewWidth, middleHeight)
-	scopeView := d.scope.View(scopeWidth, middleHeight)
-	terminalView := d.terminal.View(terminalWidth, middleHeight)
+	// 3. Controls (borderless)
+	controlsView := d.controls.View(lay.Controls.W, lay.Controls.H)
 
-	middleRow := lipgloss.JoinHorizontal(lipgloss.Top,
-		overviewView,
-		scopeView,
-		terminalView,
-	)
+	// 4. Separator
+	sep := borderSty.Render(strings.Repeat("─", d.width))
 
-	controlsView := d.controls.View(d.width, controlsHeight)
-
+	// 5. Footer
 	footer := d.renderFooter()
 
 	return lipgloss.JoinVertical(lipgloss.Left,
-		channelView,
-		middleRow,
+		channelFrame,
+		panelFrame,
 		controlsView,
+		sep,
 		footer,
 	)
 }
 
 // renderFooter renders the key-hint bar at the very bottom.
 func (d *Dashboard) renderFooter() string {
-	hint := "←→ module · tab panel · : terminal · esc back · p pull · P push · d doctor · x remove · a add · q quit"
+	hint := "←→ module · : terminal · esc back · p pull · P push · d doctor · x remove · a add · q quit"
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(d.theme.FooterFg())).
-		Background(lipgloss.Color(d.theme.FooterBg())).
 		Width(d.width)
 	return style.Render(hint)
 }

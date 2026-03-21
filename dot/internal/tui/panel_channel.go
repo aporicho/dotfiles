@@ -134,106 +134,101 @@ func (cs *ChannelStrip) hasGitChanges(mod *module.Module) bool {
 	return false
 }
 
-// View implements Panel. Renders all module chips horizontally.
-func (cs *ChannelStrip) View(width, _ int) string {
-	if len(cs.modules) == 0 {
-		return cs.addChip()
-	}
-
-	chips := make([]string, 0, len(cs.modules)+1)
-
-	const chipWidth = 10
-
-	centerStyle := lipgloss.NewStyle().Width(chipWidth).Align(lipgloss.Center)
-
-	for i, mod := range cs.modules {
-		matchesPlatform := platform.MatchesPlatform(mod.Platforms)
-		isSelected := i == cs.selected
-		isInstalled := cs.manifest.IsInstalled(mod.Name)
-		hasSecrets := len(mod.Secrets) > 0
-		hasChanges := cs.hasGitChanges(mod)
-
-		// Determine LED color.
-		var ledColor string
-		switch {
-		case !matchesPlatform:
-			ledColor = cs.theme.Dimmed()
-		case !isInstalled:
-			ledColor = cs.theme.LedError()
-		case hasChanges:
-			ledColor = cs.theme.LedWarning()
-		default:
-			ledColor = cs.theme.LedHealthy()
-		}
-
-		led := lipgloss.NewStyle().Foreground(lipgloss.Color(ledColor)).Render("●")
-
-		// Line 1: module name (centered, truncated to chipWidth).
-		name := strings.ToUpper(mod.Name)
-		if len(name) > chipWidth {
-			name = name[:chipWidth]
-		}
-		var nameLine string
-		if matchesPlatform {
-			nameLine = centerStyle.Render(name)
-		} else {
-			nameLine = centerStyle.
-				Foreground(lipgloss.Color(cs.theme.Dimmed())).
-				Render(name)
-		}
-
-		// Line 2: LED + optional indicators (centered).
-		var indicators strings.Builder
-		indicators.WriteString(led)
-		if hasSecrets {
-			indicators.WriteString(" 🔐")
-		}
-		if hasChanges {
-			indicators.WriteString(" ⚡")
-		}
-		indicatorLine := centerStyle.Render(indicators.String())
-
-		chipContent := lipgloss.JoinVertical(lipgloss.Center, nameLine, indicatorLine)
-
-		// Apply chip style.
-		var chip string
-		if isSelected {
-			chip = cs.styles.ChipSelected.Width(chipWidth).Render(chipContent)
-		} else {
-			chip = cs.styles.Chip.Width(chipWidth).Render(chipContent)
-		}
-
-		chips = append(chips, chip)
-	}
-
-	// ADD chip at the end.
-	chips = append(chips, cs.addChip())
-
-	row := lipgloss.JoinHorizontal(lipgloss.Top, chips...)
-
-	// If the row fits within width, return as-is; otherwise truncate gracefully.
-	_ = width
-	return row
+// View implements Panel. Not used directly — dashboard calls ChipContents + RenderFrame.
+func (cs *ChannelStrip) View(width, height int) string {
+	return "" // Rendering handled by dashboard_view via ChipContents + RenderFrame
 }
 
-// addChip renders the dashed "+ ADD a" chip.
-func (cs *ChannelStrip) addChip() string {
-	label := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(cs.theme.Dimmed())).
-		Render("+ ADD a")
-	addStyle := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color(cs.theme.Dimmed())).
-		BorderStyle(lipgloss.Border{
-			Top:         "─",
-			Bottom:      "─",
-			Left:        "╌",
-			Right:       "╌",
-			TopLeft:     "╌",
-			TopRight:    "╌",
-			BottomLeft:  "╌",
-			BottomRight: "╌",
-		}).
-		Padding(0, 1)
-	return addStyle.Render(label)
+// ChipContents returns pure content blocks for each chip (modules + ADD).
+// Each block is exactly chipW wide and chipH tall, ready for RenderFrame.
+func (cs *ChannelStrip) ChipContents(chipW, chipH int) []string {
+	centerStyle := lipgloss.NewStyle().Width(chipW).Align(lipgloss.Center)
+	contents := make([]string, 0, len(cs.modules)+1)
+
+	for i, mod := range cs.modules {
+		contents = append(contents, cs.renderChip(mod, i, chipW, chipH, centerStyle))
+	}
+
+	// ADD chip
+	dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color(cs.theme.Dimmed()))
+	addContent := lipgloss.NewStyle().
+		Width(chipW).Height(chipH).
+		Align(lipgloss.Center).
+		AlignVertical(lipgloss.Center).
+		Render(dimmed.Render("+ ADD") + "\n" + dimmed.Render("a"))
+	contents = append(contents, addContent)
+
+	return contents
+}
+
+// renderChip renders the pure content for a single module chip.
+func (cs *ChannelStrip) renderChip(mod *module.Module, idx, chipW, chipH int, centerStyle lipgloss.Style) string {
+	matchesPlatform := platform.MatchesPlatform(mod.Platforms)
+	isSelected := idx == cs.selected
+	isInstalled := cs.manifest.IsInstalled(mod.Name)
+	hasSecrets := len(mod.Secrets) > 0
+	hasChanges := cs.hasGitChanges(mod)
+
+	// LED color
+	var ledColor string
+	switch {
+	case !matchesPlatform:
+		ledColor = cs.theme.Dimmed()
+	case !isInstalled:
+		ledColor = cs.theme.LedError()
+	case hasChanges:
+		ledColor = cs.theme.LedWarning()
+	default:
+		ledColor = cs.theme.LedHealthy()
+	}
+	if isSelected && matchesPlatform {
+		switch {
+		case !isInstalled:
+			ledColor = cs.theme.Red()
+		case hasChanges:
+			ledColor = cs.theme.Yellow()
+		default:
+			ledColor = cs.theme.Green()
+		}
+	}
+
+	led := lipgloss.NewStyle().Foreground(lipgloss.Color(ledColor)).Render("\uf111")
+
+	// Name line
+	name := strings.ToUpper(mod.Name)
+	if len(name) > chipW {
+		name = name[:chipW]
+	}
+	var nameLine string
+	switch {
+	case !matchesPlatform:
+		nameLine = lipgloss.NewStyle().Foreground(lipgloss.Color(cs.theme.Dimmed())).Render(name)
+	case isSelected:
+		nameLine = lipgloss.NewStyle().Foreground(lipgloss.Color(cs.theme.Blue())).Bold(true).Render(name)
+	default:
+		nameLine = name
+	}
+
+	// Indicator line
+	var indicators strings.Builder
+	indicators.WriteString(led)
+	if hasSecrets {
+		indicators.WriteString(" \uf023")
+	}
+	if hasChanges {
+		indicators.WriteString(" \ue725")
+	}
+
+	inner := centerStyle.Render(nameLine) + "\n" + centerStyle.Render(indicators.String())
+
+	return lipgloss.NewStyle().
+		Width(chipW).Height(chipH).
+		Align(lipgloss.Center).
+		AlignVertical(lipgloss.Center).
+		Render(inner)
+}
+
+// ChipCount returns the total number of chips (modules + ADD).
+func (cs *ChannelStrip) ChipCount() int {
+	return len(cs.modules) + 1
 }
