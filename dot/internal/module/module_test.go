@@ -183,9 +183,9 @@ description = "module without links"
 	}
 }
 
-func TestParseWithSecrets(t *testing.T) {
+func TestParseModule_WithSecrets(t *testing.T) {
 	dir := t.TempDir()
-	tomlContent := `
+	writeModuleFile(t, dir, `
 name = "zsh"
 description = "Zsh config"
 
@@ -197,9 +197,7 @@ target = "~/.zshrc"
 source = "secrets.env"
 encrypted = "secrets.env.age"
 target = "~/.zsh/secrets.env"
-`
-	os.WriteFile(filepath.Join(dir, "module.toml"), []byte(tomlContent), 0o644)
-	os.WriteFile(filepath.Join(dir, ".zshrc"), []byte("# zshrc"), 0o644)
+`)
 
 	mod, err := Parse(dir)
 	if err != nil {
