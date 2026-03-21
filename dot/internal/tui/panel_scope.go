@@ -101,7 +101,11 @@ func (s *Scope) View(width, height int) string {
 		borderStyle = s.styles.Panel
 	}
 
-	return borderStyle.Width(inner).Render(content)
+	innerHeight := height - 2
+	if innerHeight < 1 {
+		innerHeight = 1
+	}
+	return borderStyle.Width(inner).Height(innerHeight).Render(content)
 }
 
 // renderHeader renders "▸ SCOPE: MODNAME" plus description.

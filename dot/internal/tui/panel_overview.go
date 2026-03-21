@@ -83,7 +83,11 @@ func (o *Overview) View(width, height int) string {
 		borderStyle = o.styles.Panel
 	}
 
-	return borderStyle.Width(inner).Render(content)
+	innerHeight := height - 2
+	if innerHeight < 1 {
+		innerHeight = 1
+	}
+	return borderStyle.Width(inner).Height(innerHeight).Render(content)
 }
 
 // renderHeader renders the "▸ OVERVIEW" title line.

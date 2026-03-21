@@ -142,6 +142,10 @@ func (cs *ChannelStrip) View(width, _ int) string {
 
 	chips := make([]string, 0, len(cs.modules)+1)
 
+	const chipWidth = 10
+
+	centerStyle := lipgloss.NewStyle().Width(chipWidth).Align(lipgloss.Center)
+
 	for i, mod := range cs.modules {
 		matchesPlatform := platform.MatchesPlatform(mod.Platforms)
 		isSelected := i == cs.selected
@@ -164,30 +168,39 @@ func (cs *ChannelStrip) View(width, _ int) string {
 
 		led := lipgloss.NewStyle().Foreground(lipgloss.Color(ledColor)).Render("●")
 
-		// Build chip label: NAME [🔐] [⚡] LED
-		var label strings.Builder
-		if matchesPlatform {
-			label.WriteString(mod.Name)
-		} else {
-			label.WriteString(lipgloss.NewStyle().
-				Foreground(lipgloss.Color(cs.theme.Dimmed())).
-				Render(mod.Name))
+		// Line 1: module name (centered, truncated to chipWidth).
+		name := strings.ToUpper(mod.Name)
+		if len(name) > chipWidth {
+			name = name[:chipWidth]
 		}
+		var nameLine string
+		if matchesPlatform {
+			nameLine = centerStyle.Render(name)
+		} else {
+			nameLine = centerStyle.
+				Foreground(lipgloss.Color(cs.theme.Dimmed())).
+				Render(name)
+		}
+
+		// Line 2: LED + optional indicators (centered).
+		var indicators strings.Builder
+		indicators.WriteString(led)
 		if hasSecrets {
-			label.WriteString(" 🔐")
+			indicators.WriteString(" 🔐")
 		}
 		if hasChanges {
-			label.WriteString(" ⚡")
+			indicators.WriteString(" ⚡")
 		}
-		label.WriteString(" ")
-		label.WriteString(led)
+		indicatorLine := centerStyle.Render(indicators.String())
+
+		chipContent := lipgloss.JoinVertical(lipgloss.Center, nameLine, indicatorLine)
 
 		// Apply chip style.
 		var chip string
 		if isSelected {
-			chip = cs.styles.ChipSelected.Render(label.String())
+			chip = cs.styles.ChipSelected.Width(chipWidth).Render(chipContent)
 		} else {
-			chip = cs.styles.Chip.Render(label.String())
+			chip = cs.styles.Chip.Width(chipWidth).Render(chipContent)
 		}
 
 		chips = append(chips, chip)
