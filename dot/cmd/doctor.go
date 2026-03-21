@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/aporicho/dotfiles/dot/internal/manifest"
+	"github.com/aporicho/dotfiles/dot/internal/module"
+	"github.com/aporicho/dotfiles/dot/internal/secrets"
 )
 
 var doctorCmd = &cobra.Command{
@@ -98,6 +100,54 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			}
 		}
 
+		// Check secrets
+		mod, parseErr := module.Parse(filepath.Join(dfPath, "modules", modName))
+		if parseErr == nil && len(mod.Secrets) > 0 {
+			for _, sec := range mod.Secrets {
+				plainPath := filepath.Join(mod.Dir, sec.Source)
+				encPath := filepath.Join(mod.Dir, sec.Encrypted)
+				target := expandHomePath(sec.Target)
+
+				if _, err := os.Stat(encPath); os.IsNotExist(err) {
+					issues = append(issues, fmt.Sprintf("    ✗ %s 加密文件不存在", sec.Encrypted))
+					continue
+				}
+
+				if _, err := os.Stat(plainPath); os.IsNotExist(err) {
+					issues = append(issues, fmt.Sprintf("    ✗ %s 未解密（运行 dot pull %s）", sec.Source, modName))
+					continue
+				}
+
+				info, _ := os.Stat(plainPath)
+				if info.Mode().Perm() != 0o600 {
+					issues = append(issues, fmt.Sprintf("    ✗ %s 权限为 %o，应为 0600", sec.Source, info.Mode().Perm()))
+				} else {
+					fmt.Printf("    ✓ %s 已解密且权限正确\n", sec.Source)
+				}
+
+				linkInfo, err := os.Lstat(target)
+				if err != nil {
+					issues = append(issues, fmt.Sprintf("    ✗ %s 符号链接不存在", target))
+				} else if linkInfo.Mode()&os.ModeSymlink == 0 {
+					issues = append(issues, fmt.Sprintf("    ✗ %s 不是符号链接", target))
+				} else {
+					fmt.Printf("    ✓ %s → %s\n", sec.Source, target)
+				}
+
+				// Content consistency check
+				if secrets.KeychainAvailable() {
+					if p, _ := secrets.LoadPassphrase(); p != "" {
+						changed, err := secrets.HasChanged(plainPath, encPath, p)
+						if err == nil && changed {
+							issues = append(issues, fmt.Sprintf("    ✗ %s 与 %s 内容不一致（运行 dot push 同步）", sec.Source, sec.Encrypted))
+						} else if err == nil && !changed {
+							fmt.Printf("    ✓ %s 与 %s 内容一致\n", sec.Source, sec.Encrypted)
+						}
+					}
+				}
+			}
+		}
+
 		if len(issues) == 0 {
 			fmt.Printf("  %s：✓ 正常\n", modName)
 		} else {
@@ -118,4 +168,15 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func expandHomePath(path string) string {
+	if len(path) >= 2 && path[:2] == "~/" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return filepath.Join(home, path[2:])
+	}
+	return path
 }
