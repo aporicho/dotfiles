@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Controls is the full-width horizontal bar with 4 action buttons.
+// Controls is the action button bar.
 type Controls struct {
 	executing   bool
 	confirming  bool
@@ -17,27 +17,16 @@ type Controls struct {
 	theme       Theme
 }
 
-// NewControls constructs a Controls panel.
 func NewControls(styles Styles, theme Theme) *Controls {
-	return &Controls{
-		styles: styles,
-		theme:  theme,
-	}
+	return &Controls{styles: styles, theme: theme}
 }
 
-// Focused implements Panel.
-func (c *Controls) Focused() bool { return c.focused }
-
-// SetFocus implements Panel.
-func (c *Controls) SetFocus(f bool) { c.focused = f }
-
-// SetExecuting sets the executing state directly.
-func (c *Controls) SetExecuting(executing bool) { c.executing = executing }
-
-func (c *Controls) SetConfirming(v bool)    { c.confirming = v }
+func (c *Controls) Focused() bool        { return c.focused }
+func (c *Controls) SetFocus(f bool)       { c.focused = f }
+func (c *Controls) SetExecuting(v bool)   { c.executing = v }
+func (c *Controls) SetConfirming(v bool)  { c.confirming = v }
 func (c *Controls) SetConfirmName(n string) { c.confirmName = n }
 
-// Update implements Panel.
 func (c *Controls) Update(msg tea.Msg) (Panel, tea.Cmd) {
 	switch msg.(type) {
 	case CmdStartMsg:
@@ -48,85 +37,80 @@ func (c *Controls) Update(msg tea.Msg) (Panel, tea.Cmd) {
 	return c, nil
 }
 
-// View implements Panel. Returns a single-line string (used as fallback).
-func (c *Controls) View(width, _ int) string {
-	cells := c.ViewCells([]int{width})
-	return cells[0]
+func (c *Controls) View(width, _ int) string { return "" }
+
+// BuildRow produces a Row for the controls bar.
+// panelRow is the middle-panel Row whose separators we align to.
+func (c *Controls) BuildRow(totalW int, panelRow Row) Row {
+	cols := c.alignedCols(panelRow.Cols)
+	contents := c.renderCells(cols)
+	return Row{Cols: cols, Contents: contents, Height: 1}
 }
 
-// ViewCells returns one content string per column, for use with the unified frame.
-// When confirming or executing, all columns are merged into a single centered message
-// spread across the provided widths.
-func (c *Controls) ViewCells(colWidths []int) []string {
-	totalW := 0
-	for _, w := range colWidths {
-		totalW += w
+// alignedCols produces 4 button column widths aligned to panel separators.
+// 3 panels [ow, sw, tw]: buttons = [ow, (sw-1)/2, sw-1-(sw-1)/2, tw]
+// 2 panels [sw, tw]:      buttons = [(sw-1)/2, sw-1-(sw-1)/2, (tw-1)/2, tw-1-(tw-1)/2]
+func (c *Controls) alignedCols(panelCols []int) []int {
+	split := func(w int) (int, int) {
+		left := (w - 1) / 2
+		return left, w - 1 - left
 	}
+	if len(panelCols) == 3 {
+		l, r := split(panelCols[1])
+		return []int{panelCols[0], l, r, panelCols[2]}
+	}
+	if len(panelCols) == 2 {
+		l1, r1 := split(panelCols[0])
+		l2, r2 := split(panelCols[1])
+		return []int{l1, r1, l2, r2}
+	}
+	// Fallback: single column
+	return []int{panelCols[0]}
+}
 
+// renderCells returns one content string per column.
+func (c *Controls) renderCells(cols []int) []string {
 	if c.confirming {
-		return c.spanMessage(colWidths,
+		return c.spanCells(cols,
 			lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.Red())),
 			fmt.Sprintf("确认卸载 %s？Y/N", c.confirmName))
 	}
-
 	if c.executing {
-		return c.spanMessage(colWidths,
+		return c.spanCells(cols,
 			lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.Yellow())),
 			"\uf110 执行中...")
 	}
 
-	type btnDef struct {
-		icon  string
-		label string
-		key   string
-		color string
+	type btn struct {
+		icon, label, key, color string
 	}
-
-	buttons := []btnDef{
+	buttons := []btn{
 		{"\uf0ed", "INSTALL", "p", c.theme.BtnPull()},
 		{"\uf0ee", "PUSH", "P", c.theme.BtnPush()},
 		{"\uf21e", "DOCTOR", "d", c.theme.BtnDoctor()},
 		{"\uf1f8", "UNINSTALL", "x", c.theme.BtnRemove()},
 	}
 
-	cells := make([]string, len(colWidths))
-	for i := 0; i < len(colWidths) && i < len(buttons); i++ {
-		b := buttons[i]
-		w := colWidths[i]
-
-		colorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(b.color))
-		dimmedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.Dimmed()))
-
-		label := fmt.Sprintf("%s %s", colorStyle.Render(b.icon+" "+b.label), dimmedStyle.Render(b.key))
-
-		cells[i] = lipgloss.NewStyle().
-			Width(w).
-			Align(lipgloss.Center).
-			Render(label)
+	cells := make([]string, len(cols))
+	for i := range cols {
+		if i < len(buttons) {
+			b := buttons[i]
+			color := lipgloss.NewStyle().Foreground(lipgloss.Color(b.color))
+			dim := lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.Dimmed()))
+			text := fmt.Sprintf("%s %s", color.Render(b.icon+" "+b.label), dim.Render(b.key))
+			cells[i] = lipgloss.NewStyle().Width(cols[i]).Align(lipgloss.Center).Render(text)
+		} else {
+			cells[i] = lipgloss.NewStyle().Width(cols[i]).Render("")
+		}
 	}
-	// Fill remaining columns (if any) with empty space
-	for i := len(buttons); i < len(colWidths); i++ {
-		cells[i] = lipgloss.NewStyle().Width(colWidths[i]).Render("")
-	}
-
 	return cells
 }
 
-// spanMessage renders a centered message spanning all columns.
-func (c *Controls) spanMessage(colWidths []int, style lipgloss.Style, msg string) []string {
-	cells := make([]string, len(colWidths))
-	// Put the message centered in all space
-	// First cell gets the message, rest are empty
-	totalInner := 0
-	for _, w := range colWidths {
-		totalInner += w
-	}
-	// We need to distribute the message across cells to match the column widths
-	rendered := style.Render(msg)
-	// Put it all in the first cell, padded to its width
-	cells[0] = lipgloss.NewStyle().Width(colWidths[0]).Align(lipgloss.Center).Render(rendered)
-	for i := 1; i < len(colWidths); i++ {
-		cells[i] = lipgloss.NewStyle().Width(colWidths[i]).Render("")
+func (c *Controls) spanCells(cols []int, sty lipgloss.Style, msg string) []string {
+	cells := make([]string, len(cols))
+	cells[0] = lipgloss.NewStyle().Width(cols[0]).Align(lipgloss.Center).Render(sty.Render(msg))
+	for i := 1; i < len(cols); i++ {
+		cells[i] = lipgloss.NewStyle().Width(cols[i]).Render("")
 	}
 	return cells
 }

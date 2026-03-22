@@ -10,49 +10,30 @@ func (d *Dashboard) View() string {
 		return "终端过小，请调整窗口大小（至少 60×12）"
 	}
 
-	lay := ComputeLayout(d.width, d.height, len(d.modules))
+	lay := ComputeLayout(d.width, d.height)
 	borderSty := lipgloss.NewStyle().Foreground(lipgloss.Color(d.theme.PanelBorder()))
 
-	// --- Build rows ---
+	// Each panel builds its own Row.
 	var rows []Row
 
-	// Row 1: Channel Strip chips
-	d.channel.SetVisibleChips(len(lay.ChipCols))
-	chipContents := d.channel.ChipContents(lay.ChipCols)
-	// Pad/truncate to match layout columns
-	for len(chipContents) < len(lay.ChipCols) {
-		chipContents = append(chipContents, "")
-	}
-	if len(chipContents) > len(lay.ChipCols) {
-		chipContents = chipContents[:len(lay.ChipCols)]
-	}
-	rows = append(rows, Row{Cols: lay.ChipCols, Contents: chipContents, Height: lay.ChipH})
+	// Row 1: Channel Strip (owns its column structure)
+	chipRow := d.channel.BuildRow(lay.TotalW)
+	rows = append(rows, chipRow)
 
 	// Row 2: Middle panels
-	if lay.ShowOverview {
-		ov := d.overview.View(lay.PanelCols[0], lay.PanelH)
-		sc := d.scope.View(lay.PanelCols[1], lay.PanelH)
-		tm := d.terminal.View(lay.PanelCols[2], lay.PanelH)
-		rows = append(rows, Row{Cols: lay.PanelCols, Contents: []string{ov, sc, tm}, Height: lay.PanelH})
-	} else {
-		sc := d.scope.View(lay.PanelCols[0], lay.PanelH)
-		tm := d.terminal.View(lay.PanelCols[1], lay.PanelH)
-		rows = append(rows, Row{Cols: lay.PanelCols, Contents: []string{sc, tm}, Height: lay.PanelH})
-	}
+	panelRow := buildPanelRow(lay.TotalW, lay.PanelH, lay.ShowOverview, d.overview, d.scope, d.terminal)
+	rows = append(rows, panelRow)
 
-	// Row 3: Controls (optional)
+	// Row 3: Controls (aligns to panel separators)
 	if lay.ShowControls {
-		ctrlContents := d.controls.ViewCells(lay.CtrlCols)
-		rows = append(rows, Row{Cols: lay.CtrlCols, Contents: ctrlContents, Height: 1})
+		rows = append(rows, d.controls.BuildRow(lay.TotalW, panelRow))
 	}
 
-	// Row 4: Footer (optional)
+	// Row 4: Footer
 	if lay.ShowFooter {
-		footer := d.renderFooter(lay.FooterW)
-		rows = append(rows, Row{Cols: []int{lay.FooterW}, Contents: []string{footer}, Height: 1})
+		rows = append(rows, buildFooterRow(lay.TotalW, d.theme))
 	}
 
-	// Title
 	title := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(d.theme.Dimmed())).
 		Render("\uf054 CHANNEL STRIP")
@@ -60,11 +41,49 @@ func (d *Dashboard) View() string {
 	return RenderUnifiedFrame(borderSty, title, d.width, rows)
 }
 
-// renderFooter renders the key-hint content (without borders — frame adds them).
-func (d *Dashboard) renderFooter(width int) string {
-	hint := "←→ module · : terminal · esc back · p install · P push · d doctor · x uninstall · a add · q quit"
-	style := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(d.theme.FooterFg())).
-		Width(width)
-	return style.Render(hint)
+// buildPanelRow produces the middle-panel Row. It owns the column ratio logic.
+func buildPanelRow(totalW, panelH int, showOverview bool, ov *Overview, sc *Scope, tm *Terminal) Row {
+	if showOverview {
+		pw := totalW - 4 // 4 border chars for 3 columns
+		if pw < 3 {
+			pw = 3
+		}
+		ow := pw / 4
+		tw := pw / 4
+		sw := pw - ow - tw
+		cols := []int{ow, sw, tw}
+		contents := []string{
+			ov.View(ow, panelH),
+			sc.View(sw, panelH),
+			tm.View(tw, panelH),
+		}
+		return Row{Cols: cols, Contents: contents, Height: panelH}
+	}
+
+	pw := totalW - 3 // 3 border chars for 2 columns
+	if pw < 2 {
+		pw = 2
+	}
+	sw := pw / 2
+	tw := pw - sw
+	cols := []int{sw, tw}
+	contents := []string{
+		sc.View(sw, panelH),
+		tm.View(tw, panelH),
+	}
+	return Row{Cols: cols, Contents: contents, Height: panelH}
+}
+
+// buildFooterRow produces a single-column footer Row.
+func buildFooterRow(totalW int, theme Theme) Row {
+	w := totalW - 2
+	if w < 1 {
+		w = 1
+	}
+	hint := "←→ module · : terminal · esc back · p install · P push · d doctor · x uninstall · q quit"
+	content := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(theme.FooterFg())).
+		Width(w).
+		Render(hint)
+	return Row{Cols: []int{w}, Contents: []string{content}, Height: 1}
 }

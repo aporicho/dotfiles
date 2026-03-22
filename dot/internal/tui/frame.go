@@ -166,23 +166,3 @@ func RenderUnifiedFrame(sty lipgloss.Style, title string, totalW int, rows []Row
 	return strings.Join(out, "\n")
 }
 
-// RenderFrame draws a box-drawing border around N columns of content.
-// Kept for backward compatibility where a standalone frame is needed.
-func RenderFrame(
-	border lipgloss.Border,
-	borderSty lipgloss.Style,
-	colWidths []int,
-	contents []string,
-	innerHeight int,
-) string {
-	row := Row{Cols: colWidths, Contents: contents, Height: innerHeight}
-	return RenderUnifiedFrame(borderSty, "", sumCols(colWidths)+len(colWidths)+1, []Row{row})
-}
-
-func sumCols(cols []int) int {
-	s := 0
-	for _, c := range cols {
-		s += c
-	}
-	return s
-}

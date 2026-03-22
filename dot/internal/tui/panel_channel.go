@@ -116,11 +116,6 @@ func (cs *ChannelStrip) moveNext() {
 	}
 }
 
-// SetVisibleChips sets how many chips are visible at once.
-func (cs *ChannelStrip) SetVisibleChips(n int) {
-	cs.visibleChips = n
-}
-
 // ensureVisible adjusts scrollOffset so the selected chip is within the visible window.
 func (cs *ChannelStrip) ensureVisible() {
 	if cs.visibleChips <= 0 {
@@ -167,62 +162,59 @@ func (cs *ChannelStrip) hasGitChanges(mod *module.Module) bool {
 	return false
 }
 
-// View implements Panel. Not used directly — dashboard calls ChipContents + RenderFrame.
-func (cs *ChannelStrip) View(width, height int) string {
-	return "" // Rendering handled by dashboard_view via ChipContents + RenderFrame
-}
+// View implements Panel. Not used directly — dashboard calls BuildRow.
+func (cs *ChannelStrip) View(width, height int) string { return "" }
 
-// ChipContents returns pure content blocks for the visible chips (modules + ADD).
-// colWidths provides the content width for each visible column (last may be wider
-// to absorb the remainder and fill totalW). chipH is fixed at 3.
-func (cs *ChannelStrip) ChipContents(colWidths []int) []string {
-	const chipH = 3
-	visibleCount := len(colWidths)
-
-	// Build all chips at standard width first
-	const stdW = 8
-	stdCenter := lipgloss.NewStyle().Width(stdW).Align(lipgloss.Center)
-	all := make([]string, 0, len(cs.modules))
-
-	for i, mod := range cs.modules {
-		all = append(all, cs.renderChip(mod, i, stdW, chipH, stdCenter))
+// BuildRow produces a Row for the channel strip, owning its own column structure.
+// totalW is the full terminal width; the row fills it exactly.
+func (cs *ChannelStrip) BuildRow(totalW int) Row {
+	innerW := totalW - 2 // left + right border
+	if innerW < 1 {
+		innerW = 1
 	}
 
-	// Slice to the visible window
-	start := cs.scrollOffset
-	if start < 0 {
-		start = 0
+	// How many chips fit
+	maxVis := (innerW + 1) / (chipW + 1)
+	if maxVis < 1 {
+		maxVis = 1
 	}
-	if start > len(all) {
-		start = len(all)
+	vis := len(cs.modules)
+	if vis > maxVis {
+		vis = maxVis
 	}
-	end := start + visibleCount
-	if end > len(all) {
-		end = len(all)
-	}
-	visible := all[start:end]
+	cs.visibleChips = vis
+	cs.ensureVisible()
 
-	// Re-render chips that need a different width (e.g. last column absorbs remainder)
-	for i, cw := range colWidths {
-		if i >= len(visible) {
-			break
-		}
-		if cw != stdW {
-			idx := start + i
-			if idx < len(cs.modules) {
-				center := lipgloss.NewStyle().Width(cw).Align(lipgloss.Center)
-				visible[i] = cs.renderChip(cs.modules[idx], idx, cw, chipH, center)
-			}
+	// Build column widths: N fixed-width chips + optional padding column
+	cols := make([]int, vis)
+	used := 0
+	for i := 0; i < vis; i++ {
+		cols[i] = chipW
+		used += chipW
+		if i > 0 {
+			used++ // separator
 		}
 	}
-
-	// Pad if fewer chips than columns (empty cells)
-	for len(visible) < len(colWidths) {
-		w := colWidths[len(visible)]
-		visible = append(visible, lipgloss.NewStyle().Width(w).Height(chipH).Render(""))
+	pad := innerW - used
+	if pad > 0 {
+		cols = append(cols, pad)
 	}
 
-	return visible
+	// Render visible chip contents
+	center := lipgloss.NewStyle().Width(chipW).Align(lipgloss.Center)
+	contents := make([]string, len(cols))
+	for i := 0; i < vis; i++ {
+		idx := cs.scrollOffset + i
+		if idx < len(cs.modules) {
+			contents[i] = cs.renderChip(cs.modules[idx], idx, chipW, chipH, center)
+		}
+	}
+	// Padding column (empty)
+	if pad > 0 {
+		contents[len(contents)-1] = lipgloss.NewStyle().Width(pad).Height(chipH).Render("")
+	}
+
+	return Row{Cols: cols, Contents: contents, Height: chipH}
 }
 
 // renderChip renders the pure content for a single module chip.
@@ -292,7 +284,3 @@ func (cs *ChannelStrip) renderChip(mod *module.Module, idx, chipW, chipH int, ce
 		Render(inner)
 }
 
-// ChipCount returns the total number of chips.
-func (cs *ChannelStrip) ChipCount() int {
-	return len(cs.modules)
-}
