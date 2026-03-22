@@ -59,41 +59,29 @@ func (o *Overview) Update(msg tea.Msg) (Panel, tea.Cmd) {
 
 // View implements Panel. Renders the overview content within the given dimensions.
 func (o *Overview) View(width, height int) string {
-	inner := width - 2 // subtract border columns
-	if inner < 1 {
-		inner = 1
-	}
-
 	lines := []string{
-		o.renderHeader(inner),
+		o.renderHeader(width),
 		"",
-		o.renderHealthBar(inner),
+		o.renderHealthBar(width),
 		"",
-		o.renderStats(inner),
+		o.renderStats(width),
 		"",
-		o.renderSystemInfo(inner),
+		o.renderSystemInfo(width),
 	}
 
 	content := strings.Join(lines, "\n")
 
-	var borderStyle lipgloss.Style
-	if o.focused {
-		borderStyle = o.styles.PanelFocused
-	} else {
-		borderStyle = o.styles.Panel
-	}
-
-	innerHeight := height - 2
-	if innerHeight < 1 {
-		innerHeight = 1
-	}
-	return borderStyle.Width(inner).Height(innerHeight).Render(content)
+	return lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		Padding(0, 1).
+		Render(content)
 }
 
-// renderHeader renders the "▸ OVERVIEW" title line.
+// renderHeader renders the "\uf054 OVERVIEW" title line.
 func (o *Overview) renderHeader(width int) string {
 	_ = width
-	return o.styles.Header.Render("▸ OVERVIEW")
+	return o.styles.Header.Render("\uf054 OVERVIEW")
 }
 
 // renderHealthBar renders a progress bar showing healthy links ratio.

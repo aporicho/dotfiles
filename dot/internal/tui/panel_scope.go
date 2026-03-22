@@ -70,11 +70,6 @@ func (s *Scope) Update(msg tea.Msg) (Panel, tea.Cmd) {
 
 // View implements Panel.
 func (s *Scope) View(width, height int) string {
-	inner := width - 2 // subtract border columns
-	if inner < 1 {
-		inner = 1
-	}
-
 	var lines []string
 
 	if s.module == nil {
@@ -82,7 +77,7 @@ func (s *Scope) View(width, height int) string {
 	} else {
 		lines = append(lines, s.renderHeader())
 		lines = append(lines, "")
-		lines = append(lines, s.renderMeters(inner))
+		lines = append(lines, s.renderMeters(width))
 		lines = append(lines, "")
 		lines = append(lines, s.renderSignalPath())
 		deps := s.renderDeps()
@@ -94,23 +89,16 @@ func (s *Scope) View(width, height int) string {
 
 	content := strings.Join(lines, "\n")
 
-	var borderStyle lipgloss.Style
-	if s.focused {
-		borderStyle = s.styles.PanelFocused
-	} else {
-		borderStyle = s.styles.Panel
-	}
-
-	innerHeight := height - 2
-	if innerHeight < 1 {
-		innerHeight = 1
-	}
-	return borderStyle.Width(inner).Height(innerHeight).Render(content)
+	return lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		Padding(0, 1).
+		Render(content)
 }
 
 // renderHeader renders "▸ SCOPE: MODNAME" plus description.
 func (s *Scope) renderHeader() string {
-	title := s.styles.Header.Render("▸ SCOPE: " + strings.ToUpper(s.module.Name))
+	title := s.styles.Header.Render("\uf054 SCOPE: " + strings.ToUpper(s.module.Name))
 	if s.module.Description != "" {
 		desc := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(s.theme.Dimmed())).
@@ -150,7 +138,7 @@ func (s *Scope) renderMeters(width int) string {
 	}
 
 	box := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color(s.theme.PanelBorder())).
 		Padding(0, 1).
 		Width(boxWidth).
@@ -159,12 +147,49 @@ func (s *Scope) renderMeters(width int) string {
 	return box
 }
 
-// renderLinkMeter renders the LNK progress bar.
+// manifestLinks returns the actual installed link records from manifest.
+// These are the expanded paths (source="." gets expanded to individual files).
+func (s *Scope) manifestLinks() []struct{ Source, Target string } {
+	if s.manifest == nil || s.module == nil {
+		return nil
+	}
+	rec, ok := s.manifest.Modules[s.module.Name]
+	if !ok {
+		return nil
+	}
+	var links []struct{ Source, Target string }
+	for _, lr := range rec.Links {
+		links = append(links, struct{ Source, Target string }{lr.Source, lr.Target})
+	}
+	return links
+}
+
+// isManifestLinkHealthy checks a manifest link record.
+func (s *Scope) isManifestLinkHealthy(source, target string) bool {
+	info, err := os.Lstat(target)
+	if err != nil {
+		return false
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		return false
+	}
+	actual, err := os.Readlink(target)
+	if err != nil {
+		return false
+	}
+	if !filepath.IsAbs(actual) {
+		actual = filepath.Join(filepath.Dir(target), actual)
+	}
+	return filepath.Clean(actual) == filepath.Clean(source)
+}
+
+// renderLinkMeter renders the LNK progress bar using manifest records.
 func (s *Scope) renderLinkMeter(barWidth int) string {
-	total := len(s.module.Links)
+	links := s.manifestLinks()
+	total := len(links)
 	healthy := 0
-	for _, lnk := range s.module.Links {
-		if s.isLinkHealthy(lnk) {
+	for _, lnk := range links {
+		if s.isManifestLinkHealthy(lnk.Source, lnk.Target) {
 			healthy++
 		}
 	}
@@ -260,6 +285,7 @@ func (s *Scope) progressBar(width, pct int, color string) string {
 }
 
 // renderSignalPath renders the list of links with health indicators.
+// Uses manifest records (expanded paths) instead of raw module.Links.
 func (s *Scope) renderSignalPath() string {
 	dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color(s.theme.Dimmed()))
 	header := dimmed.Render("SIGNAL PATH")
@@ -268,21 +294,20 @@ func (s *Scope) renderSignalPath() string {
 	rows = append(rows, header)
 
 	secretTargets := s.secretTargetSet()
+	links := s.manifestLinks()
 
-	for _, lnk := range s.module.Links {
-		healthy := s.isLinkHealthy(lnk)
+	for _, lnk := range links {
+		healthy := s.isManifestLinkHealthy(lnk.Source, lnk.Target)
 		var dot string
 		if healthy {
-			dot = lipgloss.NewStyle().Foreground(lipgloss.Color(s.theme.Green())).Render("●")
+			dot = lipgloss.NewStyle().Foreground(lipgloss.Color(s.theme.Green())).Render("\uf111")
 		} else {
-			dot = lipgloss.NewStyle().Foreground(lipgloss.Color(s.theme.Red())).Render("●")
+			dot = lipgloss.NewStyle().Foreground(lipgloss.Color(s.theme.Red())).Render("\uf111")
 		}
 
-		target := expandHome(lnk.Target)
-		label := target
-
-		if secretTargets[target] {
-			label = label + " 🔐"
+		label := lnk.Target
+		if secretTargets[lnk.Target] {
+			label = label + " \uf023"
 		}
 
 		pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(s.theme.Subtle()))

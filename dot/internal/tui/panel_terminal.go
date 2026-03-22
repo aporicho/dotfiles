@@ -163,46 +163,36 @@ func (t *Terminal) handleNavMode(m tea.KeyMsg) (Panel, tea.Cmd) {
 
 // View implements Panel.
 func (t *Terminal) View(width, height int) string {
-	// inner dimensions accounting for border (1 char each side).
-	inner := width - 2
-	if inner < 1 {
-		inner = 1
-	}
-	innerHeight := height - 2
-	if innerHeight < 1 {
-		innerHeight = 1
-	}
+	// Header + output + input bar
+	headerLine := t.styles.Header.Render("\uf054 TERMINAL")
+	inputBar := t.renderInputBar(width)
 
-	// Reserve 1 line for the input/hint bar at the bottom.
-	outputHeight := innerHeight - 1
+	// Output area gets remaining height: total - header(1) - input(1)
+	outputHeight := height - 2
 	if outputHeight < 0 {
 		outputHeight = 0
 	}
 
 	// Resize viewport to match current dimensions.
-	t.viewport.Width = inner
+	t.viewport.Width = width
 	t.viewport.Height = outputHeight
 
 	outputArea := t.viewport.View()
-	inputBar := t.renderInputBar(inner)
 
-	content := lipgloss.JoinVertical(lipgloss.Left, outputArea, inputBar)
+	content := lipgloss.JoinVertical(lipgloss.Left, headerLine, outputArea, inputBar)
 
-	var borderStyle lipgloss.Style
-	if t.focused {
-		borderStyle = t.styles.PanelFocused
-	} else {
-		borderStyle = t.styles.Panel
-	}
-
-	return borderStyle.Width(inner).Height(innerHeight).Render(content)
+	return lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		Padding(0, 1).
+		Render(content)
 }
 
 // renderInputBar renders the bottom prompt/hint line.
 func (t *Terminal) renderInputBar(width int) string {
 	if t.inputMode {
-		prompt := lipgloss.NewStyle().Foreground(lipgloss.Color(t.theme.Blue())).Render("dot ▸ ")
-		cursor := lipgloss.NewStyle().Foreground(lipgloss.Color(t.theme.Subtle())).Render("▋")
+		prompt := lipgloss.NewStyle().Foreground(lipgloss.Color(t.theme.Blue())).Render("dot \uf054 ")
+		cursor := lipgloss.NewStyle().Foreground(lipgloss.Color(t.theme.Subtle())).Render("\u2588")
 		return prompt + t.input + cursor
 	}
 	hint := lipgloss.NewStyle().Foreground(lipgloss.Color(t.theme.Dimmed())).Render("press : to type")

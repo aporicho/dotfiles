@@ -50,7 +50,7 @@ func (c *Controls) View(width, _ int) string {
 			Foreground(lipgloss.Color(c.theme.Yellow())).
 			Width(width).
 			Align(lipgloss.Center).
-			Render("⏳ 执行中...")
+			Render("\uf110 执行中...")
 		return executing
 	}
 
@@ -62,29 +62,32 @@ func (c *Controls) View(width, _ int) string {
 	}
 
 	buttons := []btnDef{
-		{"⬇", "PULL", "p", c.theme.BtnPull()},
-		{"⬆", "PUSH", "P", c.theme.BtnPush()},
-		{"⚕", "DOCTOR", "d", c.theme.BtnDoctor()},
-		{"✕", "REMOVE", "x", c.theme.BtnRemove()},
+		{"\uf0ed", "PULL", "p", c.theme.BtnPull()},
+		{"\uf0ee", "PUSH", "P", c.theme.BtnPush()},
+		{"\uf21e", "DOCTOR", "d", c.theme.BtnDoctor()},
+		{"\uf1f8", "REMOVE", "x", c.theme.BtnRemove()},
 	}
 
-	// Each button gets equal width. Account for 4 buttons total.
-	// Each button has a rounded border (1 char each side), so inner width = btnWidth - 2.
-	btnWidth := width / len(buttons)
-	if btnWidth < 4 {
-		btnWidth = 4
-	}
+	n := len(buttons)
+	btnWidth := width / n
+	// Distribute remainder evenly: first R buttons each get +1
+	remainder := width - btnWidth*n
 
-	rendered := make([]string, len(buttons))
+	rendered := make([]string, n)
 	for i, b := range buttons {
+		w := btnWidth
+		if i < remainder {
+			w++
+		}
+
 		colorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(b.color))
 		dimmedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.Dimmed()))
 
 		label := fmt.Sprintf("%s %s", colorStyle.Render(b.icon+" "+b.label), dimmedStyle.Render(b.key))
 
-		btnStyle := c.styles.Button.
-			Width(btnWidth - 2). // subtract border width
-			BorderForeground(lipgloss.Color(b.color))
+		btnStyle := lipgloss.NewStyle().
+			Width(w).
+			Align(lipgloss.Center)
 
 		rendered[i] = btnStyle.Render(label)
 	}
