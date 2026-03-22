@@ -199,20 +199,15 @@ func (cs *ChannelStrip) BuildRow(totalW int) Row {
 		cols[vis-1] += pad
 	}
 
-	// Render visible chip contents (always at chipW, wider columns get trailing space)
+	// Render visible chip contents at fixed chipW; pad wider columns with spaces per line
 	center := lipgloss.NewStyle().Width(chipW).Align(lipgloss.Center)
 	contents := make([]string, vis)
 	for i := 0; i < vis; i++ {
 		idx := cs.scrollOffset + i
 		if idx < len(cs.modules) {
-			w := chipW
-			// Last column may be wider; render chip at chipW, pad to full column width
-			if cols[i] > chipW {
-				w = cols[i]
-			}
 			chip := cs.renderChip(cs.modules[idx], idx, chipW, chipH, center)
-			if w > chipW {
-				chip = lipgloss.NewStyle().Width(w).Height(chipH).Render(chip)
+			if extra := cols[i] - chipW; extra > 0 {
+				chip = padRight(chip, extra, chipH)
 			}
 			contents[i] = chip
 		}
@@ -286,5 +281,19 @@ func (cs *ChannelStrip) renderChip(mod *module.Module, idx, chipW, chipH int, ce
 		Align(lipgloss.Center).
 		AlignVertical(lipgloss.Center).
 		Render(inner)
+}
+
+// padRight appends spaces to each line of a rendered block without changing its visual width.
+func padRight(block string, extra int, height int) string {
+	lines := strings.Split(block, "\n")
+	pad := strings.Repeat(" ", extra)
+	for i := range lines {
+		lines[i] += pad
+	}
+	// Ensure exactly height lines
+	for len(lines) < height {
+		lines = append(lines, strings.Repeat(" ", extra))
+	}
+	return strings.Join(lines[:height], "\n")
 }
 
