@@ -62,10 +62,10 @@ func (c *Controls) View(width, _ int) string {
 	}
 
 	buttons := []btnDef{
-		{"\uf0ed", "PULL", "p", c.theme.BtnPull()},
+		{"\uf0ed", "INSTALL", "p", c.theme.BtnPull()},
 		{"\uf0ee", "PUSH", "P", c.theme.BtnPush()},
 		{"\uf21e", "DOCTOR", "d", c.theme.BtnDoctor()},
-		{"\uf1f8", "REMOVE", "x", c.theme.BtnRemove()},
+		{"\uf1f8", "UNINSTALL", "x", c.theme.BtnRemove()},
 	}
 
 	n := len(buttons)

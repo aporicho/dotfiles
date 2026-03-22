@@ -198,7 +198,7 @@ func (d *Dashboard) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		d.controls.SetExecuting(true)
 		return d, tea.Batch(
 			func() tea.Msg { return CmdStartMsg{} },
-			execPull(d.dfPath, mod.Name),
+			execInstall(d.dfPath, mod.Name),
 		)
 
 	case "P":
@@ -230,7 +230,7 @@ func (d *Dashboard) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		d.controls.SetExecuting(true)
 		return d, tea.Batch(
 			func() tea.Msg { return CmdStartMsg{} },
-			execRemove(d.dfPath, mod.Name),
+			execUninstall(d.dfPath, mod.Name),
 		)
 
 	case "a":
@@ -262,7 +262,7 @@ func (d *Dashboard) handleTerminalExec(m TerminalExecMsg) (tea.Model, tea.Cmd) {
 	args := parts[1:]
 
 	switch cmd {
-	case "pull":
+	case "install":
 		modName := ""
 		if len(args) > 0 {
 			modName = args[0]
@@ -275,7 +275,12 @@ func (d *Dashboard) handleTerminalExec(m TerminalExecMsg) (tea.Model, tea.Cmd) {
 		}
 		d.executing = true
 		d.controls.SetExecuting(true)
-		return d, execPull(d.dfPath, modName)
+		return d, execInstall(d.dfPath, modName)
+
+	case "pull":
+		d.executing = true
+		d.controls.SetExecuting(true)
+		return d, execPull(d.dfPath)
 
 	case "push":
 		msg := "tui push"
@@ -301,15 +306,24 @@ func (d *Dashboard) handleTerminalExec(m TerminalExecMsg) (tea.Model, tea.Cmd) {
 		d.controls.SetExecuting(true)
 		return d, execDoctor(d.dfPath, modName)
 
-	case "remove":
-		if len(args) == 0 {
-			d.terminal.AppendOutput("错误：remove 需要指定模块名称")
+	case "uninstall":
+		modName := ""
+		if len(args) > 0 {
+			modName = args[0]
+		} else if mod := d.channel.Selected(); mod != nil {
+			modName = mod.Name
+		}
+		if modName == "" {
+			d.terminal.AppendOutput("错误：未指定模块")
 			return d, nil
 		}
-		modName := args[0]
 		d.executing = true
 		d.controls.SetExecuting(true)
-		return d, execRemove(d.dfPath, modName)
+		return d, execUninstall(d.dfPath, modName)
+
+	case "remove":
+		d.terminal.AppendOutput("请使用 dot remove <module> 命令行操作（不可逆操作，TUI 不支持）")
+		return d, nil
 
 	default:
 		d.terminal.AppendOutput("未知命令: " + m.Input)

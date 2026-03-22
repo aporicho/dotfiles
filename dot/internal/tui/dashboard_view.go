@@ -53,7 +53,7 @@ func (d *Dashboard) View() string {
 
 // renderFooter renders the key-hint bar at the very bottom.
 func (d *Dashboard) renderFooter() string {
-	hint := "←→ module · : terminal · esc back · p pull · P push · d doctor · x remove · a add · q quit"
+	hint := "←→ module · : terminal · esc back · p install · P push · d doctor · x uninstall · a add · q quit"
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(d.theme.FooterFg())).
 		Width(d.width)
