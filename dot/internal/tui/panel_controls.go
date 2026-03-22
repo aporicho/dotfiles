@@ -25,7 +25,7 @@ func (c *Controls) Focused() bool  { return c.focused }
 func (c *Controls) SetFocus(f bool) { c.focused = f }
 
 // Weight implements Panel.
-func (c *Controls) Weight() int { return 0 }
+func (c *Controls) Weight(int) int { return 0 }
 
 func (c *Controls) Update(msg tea.Msg) (Panel, tea.Cmd) {
 	switch m := msg.(type) {

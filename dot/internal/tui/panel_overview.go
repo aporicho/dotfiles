@@ -44,7 +44,7 @@ func (o *Overview) Focused() bool { return o.focused }
 func (o *Overview) SetFocus(f bool) { o.focused = f }
 
 // Weight implements Panel.
-func (o *Overview) Weight() int { return 1 }
+func (o *Overview) Weight(int) int { return 1 }
 
 // Update implements Panel. Only handles DataReloadMsg to refresh data.
 func (o *Overview) Update(msg tea.Msg) (Panel, tea.Cmd) {

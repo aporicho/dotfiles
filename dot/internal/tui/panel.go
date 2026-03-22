@@ -8,5 +8,5 @@ type Panel interface {
 	View(width, height int) string
 	Focused() bool
 	SetFocus(bool)
-	Weight() int // column width weight for buildPanelRow (0 = not a middle panel)
+	Weight(total int) int // column width weight; total = number of panels in this row
 }

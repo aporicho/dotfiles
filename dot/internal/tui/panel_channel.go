@@ -49,7 +49,7 @@ func (cs *ChannelStrip) Focused() bool { return cs.focused }
 func (cs *ChannelStrip) SetFocus(f bool) { cs.focused = f }
 
 // Weight implements Panel.
-func (cs *ChannelStrip) Weight() int { return 0 }
+func (cs *ChannelStrip) Weight(int) int { return 0 }
 
 // Selected returns the currently selected module (may be nil if none exist).
 func (cs *ChannelStrip) Selected() *module.Module {

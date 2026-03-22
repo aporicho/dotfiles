@@ -39,7 +39,13 @@ func (s *Scope) Focused() bool { return s.focused }
 func (s *Scope) SetFocus(f bool) { s.focused = f }
 
 // Weight implements Panel.
-func (s *Scope) Weight() int { return 2 }
+// Weight implements Panel. Returns 2 when 3 panels (1:2:1), 1 when 2 panels (1:1).
+func (s *Scope) Weight(total int) int {
+	if total >= 3 {
+		return 2
+	}
+	return 1
+}
 
 // Update implements Panel.
 func (s *Scope) Update(msg tea.Msg) (Panel, tea.Cmd) {
