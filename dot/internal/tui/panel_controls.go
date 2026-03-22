@@ -9,10 +9,12 @@ import (
 
 // Controls is the full-width horizontal bar with 4 action buttons.
 type Controls struct {
-	executing bool
-	focused   bool
-	styles    Styles
-	theme     Theme
+	executing   bool
+	confirming  bool
+	confirmName string
+	focused     bool
+	styles      Styles
+	theme       Theme
 }
 
 // NewControls constructs a Controls panel.
@@ -32,6 +34,9 @@ func (c *Controls) SetFocus(f bool) { c.focused = f }
 // SetExecuting sets the executing state directly.
 func (c *Controls) SetExecuting(executing bool) { c.executing = executing }
 
+func (c *Controls) SetConfirming(v bool)    { c.confirming = v }
+func (c *Controls) SetConfirmName(n string) { c.confirmName = n }
+
 // Update implements Panel.
 func (c *Controls) Update(msg tea.Msg) (Panel, tea.Cmd) {
 	switch msg.(type) {
@@ -45,6 +50,15 @@ func (c *Controls) Update(msg tea.Msg) (Panel, tea.Cmd) {
 
 // View implements Panel.
 func (c *Controls) View(width, _ int) string {
+	if c.confirming {
+		prompt := lipgloss.NewStyle().
+			Foreground(lipgloss.Color(c.theme.Red())).
+			Width(width).
+			Align(lipgloss.Center).
+			Render(fmt.Sprintf("确认卸载 %s？Y/N", c.confirmName))
+		return prompt
+	}
+
 	if c.executing {
 		executing := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(c.theme.Yellow())).

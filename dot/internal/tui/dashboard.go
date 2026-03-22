@@ -31,16 +31,17 @@ type Dashboard struct {
 	terminal *Terminal
 	controls *Controls
 
-	focus      focusable
-	dfPath     string
-	modules    []*module.Module
-	manifest   *manifest.Manifest
-	gitChanges []string
-	executing  bool
-	width      int
-	height     int
-	styles     Styles
-	theme      Theme
+	focus         focusable
+	dfPath        string
+	modules       []*module.Module
+	manifest      *manifest.Manifest
+	gitChanges    []string
+	executing     bool
+	confirmRemove bool
+	width         int
+	height        int
+	styles        Styles
+	theme         Theme
 }
 
 // RunDashboard is the public entry point that loads data and runs the TUI.
@@ -163,10 +164,84 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (d *Dashboard) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := m.String()
 
-	// When terminal is focused and in input mode, forward everything to terminal.
+	// When terminal is focused and in input mode, intercept Ctrl keys first.
 	if d.focus == focusTerminal && d.terminal.InputMode() {
+		switch key {
+		case "ctrl+left":
+			_, cmd := d.channel.Update(tea.KeyMsg{Type: tea.KeyLeft})
+			return d, cmd
+		case "ctrl+right":
+			_, cmd := d.channel.Update(tea.KeyMsg{Type: tea.KeyRight})
+			return d, cmd
+		case "ctrl+p":
+			mod := d.channel.Selected()
+			if mod == nil {
+				return d, nil
+			}
+			d.executing = true
+			d.controls.SetExecuting(true)
+			return d, tea.Batch(
+				func() tea.Msg { return CmdStartMsg{} },
+				execInstall(d.dfPath, mod.Name),
+			)
+		case "ctrl+u": // push (upload) — Ctrl+Shift+P is indistinguishable from Ctrl+P
+			d.executing = true
+			d.controls.SetExecuting(true)
+			return d, tea.Batch(
+				func() tea.Msg { return CmdStartMsg{} },
+				execPush(d.dfPath, "tui push"),
+			)
+		case "ctrl+d":
+			mod := d.channel.Selected()
+			if mod == nil {
+				return d, nil
+			}
+			d.executing = true
+			d.controls.SetExecuting(true)
+			return d, tea.Batch(
+				func() tea.Msg { return CmdStartMsg{} },
+				execDoctor(d.dfPath, mod.Name),
+			)
+		case "ctrl+x":
+			mod := d.channel.Selected()
+			if mod == nil {
+				return d, nil
+			}
+			d.confirmRemove = true
+			d.controls.SetConfirming(true)
+			d.controls.SetConfirmName(mod.Name)
+			return d, nil
+		case "ctrl+a":
+			d.terminal.AppendOutput("提示：请使用 dot add <module> 添加模块")
+			return d, nil
+		case "ctrl+q", "ctrl+c":
+			return d, tea.Quit
+		}
+		// All other keys go to terminal
 		_, cmd := d.terminal.Update(m)
 		return d, cmd
+	}
+
+	// Handle remove confirmation mode
+	if d.confirmRemove {
+		switch key {
+		case "y", "Y":
+			d.confirmRemove = false
+			d.controls.SetConfirming(false)
+			mod := d.channel.Selected()
+			if mod != nil {
+				d.executing = true
+				d.controls.SetExecuting(true)
+				return d, tea.Batch(
+					func() tea.Msg { return CmdStartMsg{} },
+					execUninstall(d.dfPath, mod.Name),
+				)
+			}
+		case "n", "N", "esc":
+			d.confirmRemove = false
+			d.controls.SetConfirming(false)
+		}
+		return d, nil
 	}
 
 	// When executing, only allow quit.
@@ -226,12 +301,10 @@ func (d *Dashboard) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if mod == nil {
 			return d, nil
 		}
-		d.executing = true
-		d.controls.SetExecuting(true)
-		return d, tea.Batch(
-			func() tea.Msg { return CmdStartMsg{} },
-			execUninstall(d.dfPath, mod.Name),
-		)
+		d.confirmRemove = true
+		d.controls.SetConfirming(true)
+		d.controls.SetConfirmName(mod.Name)
+		return d, nil
 
 	case "a":
 		d.terminal.AppendOutput("提示：请使用 dot add <module> 添加模块")
