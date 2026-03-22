@@ -26,22 +26,25 @@ const maxLines = 1000
 
 // Terminal is the output log + command input panel (right side).
 type Terminal struct {
-	lines    []outputLine
-	input    string
-	inputMode bool
-	focused  bool
-	styles   Styles
-	theme    Theme
-	viewport viewport.Model
+	lines        []outputLine
+	input        string
+	inputMode    bool
+	focused      bool
+	styles       Styles
+	theme        Theme
+	viewport     viewport.Model
+	history      []string
+	historyIndex int // -1 means not browsing history
 }
 
 // NewTerminal constructs a Terminal panel.
 func NewTerminal(styles Styles, theme Theme) *Terminal {
 	vp := viewport.New(0, 0)
 	return &Terminal{
-		styles:   styles,
-		theme:    theme,
-		viewport: vp,
+		styles:       styles,
+		theme:        theme,
+		viewport:     vp,
+		historyIndex: -1,
 	}
 }
 
@@ -125,9 +128,30 @@ func (t *Terminal) handleInputMode(m tea.KeyMsg) (Panel, tea.Cmd) {
 	case tea.KeyEsc:
 		t.inputMode = false
 		t.input = ""
+	case tea.KeyUp:
+		if len(t.history) > 0 {
+			if t.historyIndex == -1 {
+				t.historyIndex = len(t.history) - 1
+			} else if t.historyIndex > 0 {
+				t.historyIndex--
+			}
+			t.input = t.history[t.historyIndex]
+		}
+	case tea.KeyDown:
+		if t.historyIndex >= 0 {
+			t.historyIndex++
+			if t.historyIndex >= len(t.history) {
+				t.historyIndex = -1
+				t.input = ""
+			} else {
+				t.input = t.history[t.historyIndex]
+			}
+		}
 	case tea.KeyEnter:
 		if t.input != "" {
 			cmd := t.input
+			t.history = append(t.history, cmd)
+			t.historyIndex = -1
 			t.input = ""
 			t.inputMode = false
 			return t, func() tea.Msg {
