@@ -47,6 +47,7 @@ func (d *Dashboard) View() string {
 }
 
 // buildPanelRow produces the middle-panel Row using Panel.Weight() for column ratios.
+// For 2 panels, uses equal split (1:1) regardless of Weight to match original behavior.
 func buildPanelRow(totalW, panelH int, panels []Panel) Row {
 	n := len(panels)
 	pw := totalW - (n + 1) // border chars
@@ -54,22 +55,30 @@ func buildPanelRow(totalW, panelH int, panels []Panel) Row {
 		pw = n
 	}
 
-	totalWeight := 0
-	for _, p := range panels {
-		totalWeight += p.Weight()
-	}
-	if totalWeight == 0 {
-		totalWeight = n // fallback: equal weights
-	}
-
 	cols := make([]int, n)
-	used := 0
-	for i, p := range panels {
-		cols[i] = pw * p.Weight() / totalWeight
-		used += cols[i]
+	if n <= 2 {
+		// Equal split for 2 panels (preserves original 1:1 ratio).
+		base := pw / n
+		for i := range cols {
+			cols[i] = base
+		}
+		cols[n-1] += pw - base*n
+	} else {
+		// Weight-based split for 3+ panels.
+		totalWeight := 0
+		for _, p := range panels {
+			totalWeight += p.Weight()
+		}
+		if totalWeight == 0 {
+			totalWeight = n
+		}
+		used := 0
+		for i, p := range panels {
+			cols[i] = pw * p.Weight() / totalWeight
+			used += cols[i]
+		}
+		cols[n/2] += pw - used
 	}
-	// Give rounding remainder to the middle panel.
-	cols[n/2] += pw - used
 
 	contents := make([]string, n)
 	for i, p := range panels {
