@@ -16,9 +16,9 @@
 │ OVERVIEW  │ SCOPE                             │ TERMINAL              │
 │           │                                   │                       │
 ├───────────┼─────────┬───────────┬─────────────┼───────────────────────┤
-│  PULL p   │ PUSH P  │ DOCTOR d  │  REMOVE x   │                       │
+│ INSTALL p │ PUSH P  │ DOCTOR d  │  UNINSTALL x│                       │
 ├───────────┴─────────┴───────────┴─────────────┴───────────────────────┤
-│ ←→ module · : terminal · p pull · P push · d doctor · x remove · q    │
+│ ←→ module · : terminal · p install · P push · d doctor · x uninstall · q │
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -121,19 +121,19 @@
 
 | 按钮 | 图标 | 快捷键 |
 |------|------|--------|
-| PULL | \uf0ed | p |
+| INSTALL | \uf0ed | p |
 | PUSH | \uf0ee | P |
 | DOCTOR | \uf21e | d |
-| REMOVE | \uf1f8 | x（需二次确认） |
+| UNINSTALL | \uf1f8 | x（需二次确认） |
 
 - 4 列等分
 - 各列之间有竖线分割
 - 高度 1 行
 - 执行期��显示 spinner
 
-### Remove 确认
+### Uninstall 确认
 
-按 x 后操作栏变为"确认删除？Y/N"，再按 Y 才执行。
+按 x 后操作栏变为"确认卸载？Y/N"，再按 Y 才执行。
 
 ---
 
@@ -155,10 +155,10 @@
 | 聚焦 Terminal | `:` | — |
 | 退出 Terminal | — | esc |
 | 翻历史命令 | — | ↑↓ |
-| Pull | p | Ctrl+p |
-| Push | P | Ctrl+P |
+| Install | p | Ctrl+p |
+| Push | P | Ctrl+u |
 | Doctor | d | Ctrl+d |
-| Remove | x | Ctrl+x |
+| Uninstall | x | Ctrl+x |
 | Add | a | Ctrl+a |
 | 退出 | q | Ctrl+q |
 

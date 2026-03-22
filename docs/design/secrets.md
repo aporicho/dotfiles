@@ -53,7 +53,7 @@ target = "~/.zsh/secrets.env"
 
 | 命令 | secrets 行为 |
 |------|-------------|
-| `dot pull` | 有 `.age` 无明文 → 解密；成功后提示保存 keychain |
+| `dot install` | 有 `.age` 无明文 → 解密；成功后提示保存 keychain |
 | `dot push` | 明文有变更 → 加密生成新 `.age`；首次加密需设置 passphrase |
 | `dot doctor` | 检查：明文存在、权限 0600、符号链接正常、内容与 `.age` 一致 |
 
@@ -71,7 +71,7 @@ target = "~/.zsh/secrets.env"
 | 场景 | 行为 |
 |------|------|
 | 首次加密 | 输入 + 确认，提示保存 keychain |
-| 新机器 pull | 输入，成功后提示保存 keychain |
+| 新机器 install | 输入，成功后提示保存 keychain |
 | 日常操作（keychain 有） | 静默，零交互 |
 | passphrase 错误 | 最多重试 3 次 |
 | keychain 不可用 | 每次手动输入 |
