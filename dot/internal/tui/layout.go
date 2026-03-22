@@ -1,34 +1,26 @@
 package tui
 
-// Region describes a rectangular content area on screen.
-type Region struct {
-	X, Y, W, H int
-}
-
-// Layout holds the computed regions for all dashboard sections.
+// Layout holds computed dimensions for all 6 dashboard sections.
+// Every section's content widths and the vertical budget are calculated here.
+// The rendering layer reads Layout and never computes sizes itself.
 type Layout struct {
-	Width, Height int
+	TotalW, TotalH int
 
-	// Channel strip: the framed chip area at top
-	ChipW, ChipH int // per-chip content size
-	ChipCount    int  // number of columns in channel frame
-	ChipsPerRow  int  // number of chips visible at once
+	// --- Channel Strip ---
+	ChipW, ChipH int   // per-chip content size (fixed 8×3)
+	ChipCols     []int // content widths for each visible column (last absorbs remainder)
 
-	// Middle panel content regions (inside the frame)
-	Overview Region
-	Scope    Region
-	Terminal Region
+	// --- Middle Panels (1/4 : 2/4 : 1/4) ---
+	PanelCols []int // content widths: [overview, scope, terminal] or [scope, terminal]
+	PanelH    int   // content height (self-adaptive)
 
-	// Controls and footer (borderless)
-	Controls Region
-	Footer   Region
+	// --- Controls (4 equal buttons) ---
+	CtrlCols []int // content widths for each button
 
-	// Heights for frame rendering
-	ChannelFrameH int // total channel frame height (chipH + 2 border lines)
-	PanelFrameH   int // total panel frame height (innerH + 2 border lines)
-	PanelInnerH   int // panel content height
+	// --- Footer (single column) ---
+	FooterW int // content width (totalW - 2 borders)
 
-	// Degradation flags based on terminal size
+	// --- Degradation ---
 	ShowFooter   bool
 	ShowOverview bool
 	ShowControls bool
@@ -36,75 +28,111 @@ type Layout struct {
 
 // ComputeLayout calculates all region sizes from terminal dimensions.
 func ComputeLayout(totalW, totalH, moduleCount int) Layout {
-	lay := Layout{Width: totalW, Height: totalH}
+	lay := Layout{TotalW: totalW, TotalH: totalH}
 
-	// Channel strip: N chips (modules + ADD button)
-	n := moduleCount + 1
+	const chipW = 8
+	const chipH = 3
+	lay.ChipW = chipW
+	lay.ChipH = chipH
 
-	// Fixed chip dimensions
-	lay.ChipW = 8
-	lay.ChipH = 3
-	lay.ChannelFrameH = lay.ChipH + 2 + 1 // content + top/bottom border + title line
-
-	// Calculate visible chips per row
-	chipsPerRow := (totalW - 1) / (lay.ChipW + 1)
-	if chipsPerRow < 1 {
-		chipsPerRow = 1
-	}
-	lay.ChipsPerRow = chipsPerRow
-	lay.ChipCount = n // keep total count
-
-	// Degradation flags based on terminal size
+	// --- Degradation flags ---
 	lay.ShowFooter = totalH >= 24
 	lay.ShowOverview = totalW >= 100
 	lay.ShowControls = totalH >= 20
 
-	// Vertical budget: channelFrame + panelFrame + controls(1) + sep(1) + footer(1)
-	// Adjust budget for hidden panels
-	fixedLines := 1 // sep is always shown
-	if lay.ShowFooter {
-		fixedLines++
-	}
+	// --- Vertical budget ---
+	// title(1) + top(1) + chips(chipH) + div(1) + panels(?) + div(1) + controls(1) + div(1) + footer(1) + bottom(1)
+	fixed := 1 + 1 + chipH + 1 + 1 // title + top border + chips + chip-panel divider + bottom border
 	if lay.ShowControls {
-		fixedLines++
+		fixed += 1 + 1 // divider + controls row
 	}
-	panelBudget := totalH - lay.ChannelFrameH - fixedLines
-	lay.PanelInnerH = panelBudget - 2 // subtract panel frame top/bottom borders
-	if lay.PanelInnerH < 1 {
-		lay.PanelInnerH = 1
+	if lay.ShowFooter {
+		fixed += 1 + 1 // divider + footer row
 	}
-	lay.PanelFrameH = lay.PanelInnerH + 2
+	// If neither controls nor footer, the panels row ends with bottom border (already counted)
+	// If controls but no footer, bottom border is after controls
+	// If footer, bottom border is after footer
+	lay.PanelH = totalH - fixed
+	if lay.PanelH < 1 {
+		lay.PanelH = 1
+	}
 
-	// Horizontal layout
+	// --- Channel Strip columns ---
+	// Inner width = totalW - 2 (left + right border)
+	innerW := totalW - 2
+	if innerW < 1 {
+		innerW = 1
+	}
+	// How many chips fit: each chip needs chipW, plus 1 separator between chips
+	// N chips need: N*chipW + (N-1) separators = N*(chipW+1) - 1
+	maxChips := (innerW + 1) / (chipW + 1)
+	if maxChips < 1 {
+		maxChips = 1
+	}
+	totalChips := moduleCount + 1 // modules + ADD
+	visCols := totalChips
+	if visCols > maxChips {
+		visCols = maxChips
+	}
+
+	lay.ChipCols = make([]int, visCols)
+	used := 0
+	for i := 0; i < visCols; i++ {
+		lay.ChipCols[i] = chipW
+		used += chipW
+		if i > 0 {
+			used++ // separator
+		}
+	}
+	// Last column absorbs remainder to fill totalW
+	remainder := innerW - used
+	if remainder > 0 && visCols > 0 {
+		lay.ChipCols[visCols-1] += remainder
+	}
+
+	// --- Middle Panel columns ---
 	if lay.ShowOverview {
-		// 3 columns: panel content width = total - 4 border chars (│ + │ + │ + │)
-		contentW := totalW - 4
-		if contentW < 3 {
-			contentW = 3
+		// 3 columns: inner = totalW - 4 borders (│col│col│col│)
+		pw := totalW - 4
+		if pw < 3 {
+			pw = 3
 		}
-		ow := contentW / 4
-		tw := contentW / 4
-		sw := contentW - ow - tw
-
-		lay.Overview = Region{X: 1, W: ow, H: lay.PanelInnerH}
-		lay.Scope = Region{X: 2 + ow, W: sw, H: lay.PanelInnerH}
-		lay.Terminal = Region{X: 3 + ow + sw, W: tw, H: lay.PanelInnerH}
+		ow := pw / 4
+		tw := pw / 4
+		sw := pw - ow - tw
+		lay.PanelCols = []int{ow, sw, tw}
 	} else {
-		// 2 columns (scope + terminal): panel content width = total - 3 border chars (│ + │ + │)
-		contentW := totalW - 3
-		if contentW < 2 {
-			contentW = 2
+		// 2 columns: inner = totalW - 3 borders (│col│col│)
+		pw := totalW - 3
+		if pw < 2 {
+			pw = 2
 		}
-		half := contentW / 2
-		sw := half
-		tw := contentW - half
-
-		lay.Scope = Region{X: 1, W: sw, H: lay.PanelInnerH}
-		lay.Terminal = Region{X: 2 + sw, W: tw, H: lay.PanelInnerH}
+		sw := pw / 2
+		tw := pw - sw
+		lay.PanelCols = []int{sw, tw}
 	}
 
-	lay.Controls = Region{W: totalW, H: 1}
-	lay.Footer = Region{W: totalW, H: 1}
+	// --- Controls columns (4 buttons) ---
+	// inner = totalW - 2 borders - 3 internal separators = totalW - 5
+	cw := totalW - 5
+	if cw < 4 {
+		cw = 4
+	}
+	bw := cw / 4
+	cr := cw - bw*4
+	lay.CtrlCols = make([]int, 4)
+	for i := 0; i < 4; i++ {
+		lay.CtrlCols[i] = bw
+		if i < cr {
+			lay.CtrlCols[i]++
+		}
+	}
+
+	// --- Footer ---
+	lay.FooterW = totalW - 2
+	if lay.FooterW < 1 {
+		lay.FooterW = 1
+	}
 
 	return lay
 }

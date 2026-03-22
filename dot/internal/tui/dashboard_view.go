@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -13,86 +11,60 @@ func (d *Dashboard) View() string {
 	}
 
 	lay := ComputeLayout(d.width, d.height, len(d.modules))
-	border := lipgloss.NormalBorder()
 	borderSty := lipgloss.NewStyle().Foreground(lipgloss.Color(d.theme.PanelBorder()))
 
-	// 1. Channel strip: framed chip grid with horizontal scroll indicators
-	d.channel.SetVisibleChips(lay.ChipsPerRow)
-	chipContents := d.channel.ChipContents(lay.ChipsPerRow)
-	chipWidths := make([]int, len(chipContents))
-	for i := range chipWidths {
-		chipWidths[i] = lay.ChipW
+	// --- Build rows ---
+	var rows []Row
+
+	// Row 1: Channel Strip chips
+	d.channel.SetVisibleChips(len(lay.ChipCols))
+	chipContents := d.channel.ChipContents(lay.ChipCols)
+	// Pad/truncate to match layout columns
+	for len(chipContents) < len(lay.ChipCols) {
+		chipContents = append(chipContents, "")
+	}
+	if len(chipContents) > len(lay.ChipCols) {
+		chipContents = chipContents[:len(lay.ChipCols)]
+	}
+	rows = append(rows, Row{Cols: lay.ChipCols, Contents: chipContents, Height: lay.ChipH})
+
+	// Row 2: Middle panels
+	if lay.ShowOverview {
+		ov := d.overview.View(lay.PanelCols[0], lay.PanelH)
+		sc := d.scope.View(lay.PanelCols[1], lay.PanelH)
+		tm := d.terminal.View(lay.PanelCols[2], lay.PanelH)
+		rows = append(rows, Row{Cols: lay.PanelCols, Contents: []string{ov, sc, tm}, Height: lay.PanelH})
+	} else {
+		sc := d.scope.View(lay.PanelCols[0], lay.PanelH)
+		tm := d.terminal.View(lay.PanelCols[1], lay.PanelH)
+		rows = append(rows, Row{Cols: lay.PanelCols, Contents: []string{sc, tm}, Height: lay.PanelH})
 	}
 
-	// Prepend/append scroll indicator columns when chips overflow
-	if d.channel.CanScrollLeft() {
-		indicator := lipgloss.NewStyle().
-			Width(1).Height(lay.ChipH).
-			Align(lipgloss.Center).AlignVertical(lipgloss.Center).
-			Foreground(lipgloss.Color(d.theme.Blue())).
-			Render("◂")
-		chipContents = append([]string{indicator}, chipContents...)
-		chipWidths = append([]int{1}, chipWidths...)
-	}
-	if d.channel.CanScrollRight() {
-		indicator := lipgloss.NewStyle().
-			Width(1).Height(lay.ChipH).
-			Align(lipgloss.Center).AlignVertical(lipgloss.Center).
-			Foreground(lipgloss.Color(d.theme.Blue())).
-			Render("▸")
-		chipContents = append(chipContents, indicator)
-		chipWidths = append(chipWidths, 1)
+	// Row 3: Controls (optional)
+	if lay.ShowControls {
+		ctrlContents := d.controls.ViewCells(lay.CtrlCols)
+		rows = append(rows, Row{Cols: lay.CtrlCols, Contents: ctrlContents, Height: 1})
 	}
 
-	channelTitle := lipgloss.NewStyle().
+	// Row 4: Footer (optional)
+	if lay.ShowFooter {
+		footer := d.renderFooter(lay.FooterW)
+		rows = append(rows, Row{Cols: []int{lay.FooterW}, Contents: []string{footer}, Height: 1})
+	}
+
+	// Title
+	title := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(d.theme.Dimmed())).
 		Render("\uf054 CHANNEL STRIP")
-	channelFrame := channelTitle + "\n" + RenderFrame(border, borderSty, chipWidths, chipContents, lay.ChipH)
 
-	// 2. Middle panels
-	var panelWidths []int
-	var panelContents []string
-
-	if lay.ShowOverview {
-		overviewContent := d.overview.View(lay.Overview.W, lay.PanelInnerH)
-		scopeContent := d.scope.View(lay.Scope.W, lay.PanelInnerH)
-		terminalContent := d.terminal.View(lay.Terminal.W, lay.PanelInnerH)
-		panelWidths = []int{lay.Overview.W, lay.Scope.W, lay.Terminal.W}
-		panelContents = []string{overviewContent, scopeContent, terminalContent}
-	} else {
-		scopeContent := d.scope.View(lay.Scope.W, lay.PanelInnerH)
-		terminalContent := d.terminal.View(lay.Terminal.W, lay.PanelInnerH)
-		panelWidths = []int{lay.Scope.W, lay.Terminal.W}
-		panelContents = []string{scopeContent, terminalContent}
-	}
-	panelFrame := RenderFrame(border, borderSty, panelWidths, panelContents, lay.PanelInnerH)
-
-	// 3. Controls (borderless)
-	controlsView := d.controls.View(lay.Controls.W, lay.Controls.H)
-
-	// 4. Separator
-	sep := borderSty.Render(strings.Repeat("─", d.width))
-
-	// 5. Footer
-	footer := d.renderFooter()
-
-	// Assemble
-	parts := []string{channelFrame, panelFrame}
-	if lay.ShowControls {
-		parts = append(parts, controlsView)
-	}
-	parts = append(parts, sep)
-	if lay.ShowFooter {
-		parts = append(parts, footer)
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+	return RenderUnifiedFrame(borderSty, title, d.width, rows)
 }
 
-// renderFooter renders the key-hint bar at the very bottom.
-func (d *Dashboard) renderFooter() string {
+// renderFooter renders the key-hint content (without borders — frame adds them).
+func (d *Dashboard) renderFooter(width int) string {
 	hint := "←→ module · : terminal · esc back · p install · P push · d doctor · x uninstall · a add · q quit"
 	style := lipgloss.NewStyle().
 		Foreground(lipgloss.Color(d.theme.FooterFg())).
-		Width(d.width)
+		Width(width)
 	return style.Render(hint)
 }

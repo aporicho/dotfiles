@@ -174,21 +174,25 @@ func (cs *ChannelStrip) View(width, height int) string {
 }
 
 // ChipContents returns pure content blocks for the visible chips (modules + ADD).
-// Chip dimensions are fixed at ChipW=8, ChipH=3. visibleCount controls how many
-// chips are returned starting from the current scrollOffset.
-func (cs *ChannelStrip) ChipContents(visibleCount int) []string {
-	const chipW, chipH = 8, 3
-	centerStyle := lipgloss.NewStyle().Width(chipW).Align(lipgloss.Center)
+// colWidths provides the content width for each visible column (last may be wider
+// to absorb the remainder and fill totalW). chipH is fixed at 3.
+func (cs *ChannelStrip) ChipContents(colWidths []int) []string {
+	const chipH = 3
+	visibleCount := len(colWidths)
+
+	// Build all chips at standard width first
+	const stdW = 8
+	stdCenter := lipgloss.NewStyle().Width(stdW).Align(lipgloss.Center)
 	all := make([]string, 0, len(cs.modules)+1)
 
 	for i, mod := range cs.modules {
-		all = append(all, cs.renderChip(mod, i, chipW, chipH, centerStyle))
+		all = append(all, cs.renderChip(mod, i, stdW, chipH, stdCenter))
 	}
 
 	// ADD chip
 	dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color(cs.theme.Dimmed()))
 	addContent := lipgloss.NewStyle().
-		Width(chipW).Height(chipH).
+		Width(stdW).Height(chipH).
 		Align(lipgloss.Center).
 		AlignVertical(lipgloss.Center).
 		Render(dimmed.Render("+ ADD") + "\n" + dimmed.Render("a"))
@@ -206,7 +210,36 @@ func (cs *ChannelStrip) ChipContents(visibleCount int) []string {
 	if end > len(all) {
 		end = len(all)
 	}
-	return all[start:end]
+	visible := all[start:end]
+
+	// Re-render chips that need a different width (e.g. last column absorbs remainder)
+	for i, cw := range colWidths {
+		if i >= len(visible) {
+			break
+		}
+		if cw != stdW {
+			idx := start + i
+			if idx < len(cs.modules) {
+				center := lipgloss.NewStyle().Width(cw).Align(lipgloss.Center)
+				visible[i] = cs.renderChip(cs.modules[idx], idx, cw, chipH, center)
+			} else {
+				// ADD chip with different width
+				visible[i] = lipgloss.NewStyle().
+					Width(cw).Height(chipH).
+					Align(lipgloss.Center).
+					AlignVertical(lipgloss.Center).
+					Render(dimmed.Render("+ ADD") + "\n" + dimmed.Render("a"))
+			}
+		}
+	}
+
+	// Pad if fewer chips than columns (empty cells)
+	for len(visible) < len(colWidths) {
+		w := colWidths[len(visible)]
+		visible = append(visible, lipgloss.NewStyle().Width(w).Height(chipH).Render(""))
+	}
+
+	return visible
 }
 
 // renderChip renders the pure content for a single module chip.

@@ -48,28 +48,31 @@ func (c *Controls) Update(msg tea.Msg) (Panel, tea.Cmd) {
 	return c, nil
 }
 
-// View implements Panel.
+// View implements Panel. Returns a single-line string (used as fallback).
 func (c *Controls) View(width, _ int) string {
-	borderSty := lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.PanelBorder()))
-	vbar := borderSty.Render("│")
-	innerW := width - 2 // subtract left + right │
+	cells := c.ViewCells([]int{width})
+	return cells[0]
+}
+
+// ViewCells returns one content string per column, for use with the unified frame.
+// When confirming or executing, all columns are merged into a single centered message
+// spread across the provided widths.
+func (c *Controls) ViewCells(colWidths []int) []string {
+	totalW := 0
+	for _, w := range colWidths {
+		totalW += w
+	}
 
 	if c.confirming {
-		prompt := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(c.theme.Red())).
-			Width(innerW).
-			Align(lipgloss.Center).
-			Render(fmt.Sprintf("确认卸载 %s？Y/N", c.confirmName))
-		return vbar + prompt + vbar
+		return c.spanMessage(colWidths,
+			lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.Red())),
+			fmt.Sprintf("确认卸载 %s？Y/N", c.confirmName))
 	}
 
 	if c.executing {
-		executing := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(c.theme.Yellow())).
-			Width(innerW).
-			Align(lipgloss.Center).
-			Render("\uf110 执行中...")
-		return vbar + executing + vbar
+		return c.spanMessage(colWidths,
+			lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.Yellow())),
+			"\uf110 执行中...")
 	}
 
 	type btnDef struct {
@@ -86,28 +89,44 @@ func (c *Controls) View(width, _ int) string {
 		{"\uf1f8", "UNINSTALL", "x", c.theme.BtnRemove()},
 	}
 
-	n := len(buttons)
-	btnWidth := innerW / n
-	remainder := innerW - btnWidth*n
-
-	rendered := make([]string, n)
-	for i, b := range buttons {
-		w := btnWidth
-		if i < remainder {
-			w++
-		}
+	cells := make([]string, len(colWidths))
+	for i := 0; i < len(colWidths) && i < len(buttons); i++ {
+		b := buttons[i]
+		w := colWidths[i]
 
 		colorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(b.color))
 		dimmedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.Dimmed()))
 
 		label := fmt.Sprintf("%s %s", colorStyle.Render(b.icon+" "+b.label), dimmedStyle.Render(b.key))
 
-		btnStyle := lipgloss.NewStyle().
+		cells[i] = lipgloss.NewStyle().
 			Width(w).
-			Align(lipgloss.Center)
-
-		rendered[i] = btnStyle.Render(label)
+			Align(lipgloss.Center).
+			Render(label)
+	}
+	// Fill remaining columns (if any) with empty space
+	for i := len(buttons); i < len(colWidths); i++ {
+		cells[i] = lipgloss.NewStyle().Width(colWidths[i]).Render("")
 	}
 
-	return vbar + lipgloss.JoinHorizontal(lipgloss.Top, rendered...) + vbar
+	return cells
+}
+
+// spanMessage renders a centered message spanning all columns.
+func (c *Controls) spanMessage(colWidths []int, style lipgloss.Style, msg string) []string {
+	cells := make([]string, len(colWidths))
+	// Put the message centered in all space
+	// First cell gets the message, rest are empty
+	totalInner := 0
+	for _, w := range colWidths {
+		totalInner += w
+	}
+	// We need to distribute the message across cells to match the column widths
+	rendered := style.Render(msg)
+	// Put it all in the first cell, padded to its width
+	cells[0] = lipgloss.NewStyle().Width(colWidths[0]).Align(lipgloss.Center).Render(rendered)
+	for i := 1; i < len(colWidths); i++ {
+		cells[i] = lipgloss.NewStyle().Width(colWidths[i]).Render("")
+	}
+	return cells
 }
