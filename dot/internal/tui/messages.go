@@ -26,3 +26,15 @@ type DataReloadMsg struct {
 	Manifest   *manifest.Manifest
 	GitChanges []string
 }
+
+// ConfirmStartMsg signals the dashboard entered remove-confirmation mode.
+type ConfirmStartMsg struct{ ModuleName string }
+
+// ConfirmCancelMsg signals the dashboard exited remove-confirmation mode.
+type ConfirmCancelMsg struct{}
+
+// TerminalHintMsg carries a hint/info line to display in the terminal panel.
+type TerminalHintMsg struct{ Text string }
+
+// TerminalExecMsg is sent when the user submits a command in the terminal panel.
+type TerminalExecMsg struct{ Input string }

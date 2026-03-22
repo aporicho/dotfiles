@@ -10,11 +10,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// TerminalExecMsg is sent when the user submits a command in the terminal panel.
-type TerminalExecMsg struct {
-	Input string
-}
-
 // outputLine holds a single line of terminal output with a timestamp.
 type outputLine struct {
 	text      string
