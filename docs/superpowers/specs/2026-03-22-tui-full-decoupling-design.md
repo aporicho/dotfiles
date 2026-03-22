@@ -69,7 +69,9 @@ type Panel interface {
 }
 ```
 
-各面板默认 Weight：Overview=1, Scope=2, Terminal=1（保持当前 1:2:1 比例）。ChannelStrip 和 Controls 不参与 buildPanelRow，Weight 返回 0。
+各面板 Weight 值：Overview=1, Scope=2, Terminal=2, ChannelStrip=0, Controls=0。
+
+注意：当前 2 列模式是 Scope:Terminal = 1:1（各 pw/2）。为保持该比例，Terminal.Weight 必须等于 Scope.Weight=2。3 列模式比例从当前 1:2:1 变为 1:2:2（Overview 面板只在宽屏>=100 显示，占比减小可接受）。
 
 ### 3. Dashboard 瘦身为纯消息路由器
 
@@ -155,10 +157,12 @@ var normalKeyMap = map[string]string{
 }
 
 var ctrlKeyMap = map[string]string{
-    "ctrl+p": "install",
-    "ctrl+u": "push",
-    "ctrl+d": "doctor",
-    "ctrl+x": "confirm-remove",
+    "ctrl+p":     "install",
+    "ctrl+u":     "push",
+    "ctrl+d":     "doctor",
+    "ctrl+x":     "confirm-remove",
+    "ctrl+left":  "channel-prev",  // 保留：terminal input mode 下切换模块
+    "ctrl+right": "channel-next",  // 保留：terminal input mode 下切换模块
 }
 ```
 
@@ -179,6 +183,12 @@ func (d *Dashboard) execAction(action string) (tea.Model, tea.Cmd) {
     case "confirm-remove":
         if mod == nil { return d, nil }
         return d.broadcast(ConfirmStartMsg{ModuleName: mod.Name})
+    case "channel-prev":
+        _, cmd := d.channel.Update(tea.KeyMsg{Type: tea.KeyLeft})
+        return d, cmd
+    case "channel-next":
+        _, cmd := d.channel.Update(tea.KeyMsg{Type: tea.KeyRight})
+        return d, cmd
     }
     return d, nil
 }
@@ -205,7 +215,6 @@ func (d *Dashboard) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
     }
 
     // Terminal input mode
-    if d.focusedPanel() == d.channel && false { /* placeholder */ }
     if tm, ok := d.panels[d.focus].(*Terminal); ok && tm.InputMode() {
         if action, ok := ctrlKeyMap[key]; ok {
             return d.execAction(action)
@@ -458,7 +467,7 @@ if lay.ShowOverview {
 panelRow := buildPanelRow(lay.TotalW, lay.PanelH, middlePanels)
 ```
 
-（这里 `d.overview()` 等是从 `d.panels` 切片中按类型获取的辅助方法，或直接保留具名字段引用。）
+Dashboard.View() 中直接使用具名字段引用（`d.overview`、`d.scope`、`d.terminal`），不引入额外的辅助方法。Dashboard 保留这些具名字段是因为 View 组装需要知道哪些面板属于中间行。
 
 ### 8. 数据流统一
 
@@ -471,6 +480,30 @@ func (d *Dashboard) Init() tea.Cmd {
 ```
 
 DataReloadMsg 到达时，所有面板通过 broadcast 统一更新。初始化和重载走同一条路径。
+
+注意：Init() 返回异步 cmd，首帧渲染时 DataReloadMsg 尚未到达，面板数据为空。各面板的 View() 应优雅处理空数据状态（显示空白或占位文本）。当前面板已经能处理空数据（modules=nil 时显示空列表），所以这不是新问题。
+
+### 9. handleConfirmKey
+
+从当前 dashboard.go 228-244 行提取：
+
+```go
+func (d *Dashboard) handleConfirmKey(key string) (tea.Model, tea.Cmd) {
+    switch key {
+    case "y", "Y":
+        mod := d.channel.Selected()
+        if mod != nil {
+            return d.broadcastAndExec(ConfirmCancelMsg{}, execUninstall(d.dfPath, mod.Name))
+        }
+        return d.broadcast(ConfirmCancelMsg{})
+    case "n", "N", "esc":
+        return d.broadcast(ConfirmCancelMsg{})
+    }
+    return d, nil
+}
+```
+
+注意：确认后同时广播 ConfirmCancelMsg（清除确认状态）并��行卸载命令。
 
 ## 文件改动范围
 
