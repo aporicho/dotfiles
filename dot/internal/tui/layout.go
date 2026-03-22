@@ -75,6 +75,7 @@ func ComputeLayout(totalW, totalH, moduleCount int) Layout {
 		visCols = maxChips
 	}
 
+	// All chips are fixed width. If there's leftover space, add a padding column.
 	lay.ChipCols = make([]int, visCols)
 	used := 0
 	for i := 0; i < visCols; i++ {
@@ -84,10 +85,10 @@ func ComputeLayout(totalW, totalH, moduleCount int) Layout {
 			used++ // separator
 		}
 	}
-	// Last column absorbs remainder to fill totalW
 	remainder := innerW - used
-	if remainder > 0 && visCols > 0 {
-		lay.ChipCols[visCols-1] += remainder
+	if remainder > 0 {
+		// Add an empty padding column to fill totalW
+		lay.ChipCols = append(lay.ChipCols, remainder)
 	}
 
 	// --- Middle Panel columns ---
