@@ -24,24 +24,12 @@ type ChannelStrip struct {
 	visibleChips int
 }
 
-// NewChannelStrip constructs a ChannelStrip with the given modules and state.
-func NewChannelStrip(
-	modules []*module.Module,
-	mf *manifest.Manifest,
-	gitChanges []string,
-	styles Styles,
-	theme Theme,
-) *ChannelStrip {
-	cs := &ChannelStrip{
-		modules:    modules,
-		manifest:   mf,
-		gitChanges: gitChanges,
-		styles:     styles,
-		theme:      theme,
+// NewChannelStrip constructs a ChannelStrip. Data arrives via DataReloadMsg.
+func NewChannelStrip(theme Theme) *ChannelStrip {
+	return &ChannelStrip{
+		styles: NewStyles(theme),
+		theme:  theme,
 	}
-	// Ensure selected starts on a navigable module.
-	cs.selected = cs.firstNavigable()
-	return cs
 }
 
 // firstNavigable returns the index of the first platform-matching module, or 0.
@@ -74,26 +62,33 @@ func (cs *ChannelStrip) Selected() *module.Module {
 // SelectedIndex returns the index of the currently selected module.
 func (cs *ChannelStrip) SelectedIndex() int { return cs.selected }
 
-// Update implements Panel. Handles ←→ navigation when focused.
+// Update implements Panel. Handles DataReloadMsg for data and ←→ for navigation.
 func (cs *ChannelStrip) Update(msg tea.Msg) (Panel, tea.Cmd) {
-	if !cs.focused {
-		return cs, nil
-	}
-
-	keyMsg, ok := msg.(tea.KeyMsg)
-	if !ok {
-		return cs, nil
-	}
-
-	switch keyMsg.String() {
-	case "left", "h":
-		cs.movePrev()
+	switch m := msg.(type) {
+	case DataReloadMsg:
+		cs.modules = m.Modules
+		cs.manifest = m.Manifest
+		cs.gitChanges = m.GitChanges
+		// Preserve selection if still valid, else reset.
+		if cs.selected >= len(cs.modules) {
+			cs.selected = cs.firstNavigable()
+		}
+		// Emit selection so Scope updates.
 		return cs, cs.emitSelected()
-	case "right", "l":
-		cs.moveNext()
-		return cs, cs.emitSelected()
-	}
 
+	case tea.KeyMsg:
+		if !cs.focused {
+			return cs, nil
+		}
+		switch m.String() {
+		case "left", "h":
+			cs.movePrev()
+			return cs, cs.emitSelected()
+		case "right", "l":
+			cs.moveNext()
+			return cs, cs.emitSelected()
+		}
+	}
 	return cs, nil
 }
 
