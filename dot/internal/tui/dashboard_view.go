@@ -44,7 +44,10 @@ func (d *Dashboard) View() string {
 		chipWidths = append(chipWidths, 1)
 	}
 
-	channelFrame := RenderFrame(border, borderSty, chipWidths, chipContents, lay.ChipH)
+	channelTitle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color(d.theme.Dimmed())).
+		Render("\uf054 CHANNEL STRIP")
+	channelFrame := channelTitle + "\n" + RenderFrame(border, borderSty, chipWidths, chipContents, lay.ChipH)
 
 	// 2. Middle panels
 	var panelWidths []int

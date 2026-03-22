@@ -132,16 +132,19 @@ func (s *Scope) renderMeters(width int) string {
 
 	content := strings.Join(meterLines, "\n")
 
-	boxWidth := width - 2
-	if boxWidth < 4 {
-		boxWidth = 4
+	// Available width after parent padding (Scope.View has Padding(0,1) = 2 chars)
+	// Box border adds 2 chars, box padding adds 2 chars
+	// So content width = available - border(2) - padding(2)
+	boxContentW := width - 2 - 2 - 2
+	if boxContentW < 4 {
+		boxContentW = 4
 	}
 
 	box := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color(s.theme.PanelBorder())).
 		Padding(0, 1).
-		Width(boxWidth).
+		Width(boxContentW).
 		Render(content)
 
 	return box

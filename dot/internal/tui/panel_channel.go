@@ -174,10 +174,10 @@ func (cs *ChannelStrip) View(width, height int) string {
 }
 
 // ChipContents returns pure content blocks for the visible chips (modules + ADD).
-// Chip dimensions are fixed at ChipW=8, ChipH=4. visibleCount controls how many
+// Chip dimensions are fixed at ChipW=8, ChipH=3. visibleCount controls how many
 // chips are returned starting from the current scrollOffset.
 func (cs *ChannelStrip) ChipContents(visibleCount int) []string {
-	const chipW, chipH = 8, 4
+	const chipW, chipH = 8, 3
 	centerStyle := lipgloss.NewStyle().Width(chipW).Align(lipgloss.Center)
 	all := make([]string, 0, len(cs.modules)+1)
 

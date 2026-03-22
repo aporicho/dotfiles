@@ -43,8 +43,8 @@ func ComputeLayout(totalW, totalH, moduleCount int) Layout {
 
 	// Fixed chip dimensions
 	lay.ChipW = 8
-	lay.ChipH = 4
-	lay.ChannelFrameH = lay.ChipH + 2 // content + top/bottom border
+	lay.ChipH = 3
+	lay.ChannelFrameH = lay.ChipH + 2 + 1 // content + top/bottom border + title line
 
 	// Calculate visible chips per row
 	chipsPerRow := (totalW - 1) / (lay.ChipW + 1)

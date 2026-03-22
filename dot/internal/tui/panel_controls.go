@@ -50,22 +50,26 @@ func (c *Controls) Update(msg tea.Msg) (Panel, tea.Cmd) {
 
 // View implements Panel.
 func (c *Controls) View(width, _ int) string {
+	borderSty := lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.PanelBorder()))
+	vbar := borderSty.Render("│")
+	innerW := width - 2 // subtract left + right │
+
 	if c.confirming {
 		prompt := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(c.theme.Red())).
-			Width(width).
+			Width(innerW).
 			Align(lipgloss.Center).
 			Render(fmt.Sprintf("确认卸载 %s？Y/N", c.confirmName))
-		return prompt
+		return vbar + prompt + vbar
 	}
 
 	if c.executing {
 		executing := lipgloss.NewStyle().
 			Foreground(lipgloss.Color(c.theme.Yellow())).
-			Width(width).
+			Width(innerW).
 			Align(lipgloss.Center).
 			Render("\uf110 执行中...")
-		return executing
+		return vbar + executing + vbar
 	}
 
 	type btnDef struct {
@@ -83,9 +87,8 @@ func (c *Controls) View(width, _ int) string {
 	}
 
 	n := len(buttons)
-	btnWidth := width / n
-	// Distribute remainder evenly: first R buttons each get +1
-	remainder := width - btnWidth*n
+	btnWidth := innerW / n
+	remainder := innerW - btnWidth*n
 
 	rendered := make([]string, n)
 	for i, b := range buttons {
@@ -106,5 +109,5 @@ func (c *Controls) View(width, _ int) string {
 		rendered[i] = btnStyle.Render(label)
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
+	return vbar + lipgloss.JoinHorizontal(lipgloss.Top, rendered...) + vbar
 }
