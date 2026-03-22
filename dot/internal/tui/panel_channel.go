@@ -13,13 +13,15 @@ import (
 
 // ChannelStrip is the top bar showing all modules as chips with LED status indicators.
 type ChannelStrip struct {
-	modules    []*module.Module
-	manifest   *manifest.Manifest
-	gitChanges []string
-	selected   int
-	focused    bool
-	styles     Styles
-	theme      Theme
+	modules      []*module.Module
+	manifest     *manifest.Manifest
+	gitChanges   []string
+	selected     int
+	focused      bool
+	styles       Styles
+	theme        Theme
+	scrollOffset int
+	visibleChips int
 }
 
 // NewChannelStrip constructs a ChannelStrip with the given modules and state.
@@ -97,6 +99,7 @@ func (cs *ChannelStrip) movePrev() {
 	for i := cs.selected - 1; i >= 0; i-- {
 		if platform.MatchesPlatform(cs.modules[i].Platforms) {
 			cs.selected = i
+			cs.ensureVisible()
 			return
 		}
 	}
@@ -107,9 +110,40 @@ func (cs *ChannelStrip) moveNext() {
 	for i := cs.selected + 1; i < len(cs.modules); i++ {
 		if platform.MatchesPlatform(cs.modules[i].Platforms) {
 			cs.selected = i
+			cs.ensureVisible()
 			return
 		}
 	}
+}
+
+// SetVisibleChips sets how many chips are visible at once.
+func (cs *ChannelStrip) SetVisibleChips(n int) {
+	cs.visibleChips = n
+}
+
+// ensureVisible adjusts scrollOffset so the selected chip is within the visible window.
+func (cs *ChannelStrip) ensureVisible() {
+	if cs.visibleChips <= 0 {
+		return
+	}
+	if cs.selected < cs.scrollOffset {
+		cs.scrollOffset = cs.selected
+	}
+	if cs.selected >= cs.scrollOffset+cs.visibleChips {
+		cs.scrollOffset = cs.selected - cs.visibleChips + 1
+	}
+}
+
+// ScrollOffset returns the current horizontal scroll offset.
+func (cs *ChannelStrip) ScrollOffset() int { return cs.scrollOffset }
+
+// CanScrollLeft reports whether there are chips scrolled off to the left.
+func (cs *ChannelStrip) CanScrollLeft() bool { return cs.scrollOffset > 0 }
+
+// CanScrollRight reports whether there are chips scrolled off to the right.
+func (cs *ChannelStrip) CanScrollRight() bool {
+	total := len(cs.modules) + 1 // modules + ADD
+	return cs.scrollOffset+cs.visibleChips < total
 }
 
 // emitSelected returns a Cmd that sends a ModuleSelectedMsg for the current selection.
@@ -139,14 +173,16 @@ func (cs *ChannelStrip) View(width, height int) string {
 	return "" // Rendering handled by dashboard_view via ChipContents + RenderFrame
 }
 
-// ChipContents returns pure content blocks for each chip (modules + ADD).
-// Each block is exactly chipW wide and chipH tall, ready for RenderFrame.
-func (cs *ChannelStrip) ChipContents(chipW, chipH int) []string {
+// ChipContents returns pure content blocks for the visible chips (modules + ADD).
+// Chip dimensions are fixed at ChipW=8, ChipH=4. visibleCount controls how many
+// chips are returned starting from the current scrollOffset.
+func (cs *ChannelStrip) ChipContents(visibleCount int) []string {
+	const chipW, chipH = 8, 4
 	centerStyle := lipgloss.NewStyle().Width(chipW).Align(lipgloss.Center)
-	contents := make([]string, 0, len(cs.modules)+1)
+	all := make([]string, 0, len(cs.modules)+1)
 
 	for i, mod := range cs.modules {
-		contents = append(contents, cs.renderChip(mod, i, chipW, chipH, centerStyle))
+		all = append(all, cs.renderChip(mod, i, chipW, chipH, centerStyle))
 	}
 
 	// ADD chip
@@ -156,9 +192,21 @@ func (cs *ChannelStrip) ChipContents(chipW, chipH int) []string {
 		Align(lipgloss.Center).
 		AlignVertical(lipgloss.Center).
 		Render(dimmed.Render("+ ADD") + "\n" + dimmed.Render("a"))
-	contents = append(contents, addContent)
+	all = append(all, addContent)
 
-	return contents
+	// Slice to the visible window
+	start := cs.scrollOffset
+	if start < 0 {
+		start = 0
+	}
+	if start > len(all) {
+		start = len(all)
+	}
+	end := start + visibleCount
+	if end > len(all) {
+		end = len(all)
+	}
+	return all[start:end]
 }
 
 // renderChip renders the pure content for a single module chip.

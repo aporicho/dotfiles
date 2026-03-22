@@ -16,12 +16,34 @@ func (d *Dashboard) View() string {
 	border := lipgloss.NormalBorder()
 	borderSty := lipgloss.NewStyle().Foreground(lipgloss.Color(d.theme.PanelBorder()))
 
-	// 1. Channel strip: framed chip grid
-	chipContents := d.channel.ChipContents(lay.ChipW, lay.ChipH)
+	// 1. Channel strip: framed chip grid with horizontal scroll indicators
+	d.channel.SetVisibleChips(lay.ChipsPerRow)
+	chipContents := d.channel.ChipContents(lay.ChipsPerRow)
 	chipWidths := make([]int, len(chipContents))
 	for i := range chipWidths {
 		chipWidths[i] = lay.ChipW
 	}
+
+	// Prepend/append scroll indicator columns when chips overflow
+	if d.channel.CanScrollLeft() {
+		indicator := lipgloss.NewStyle().
+			Width(1).Height(lay.ChipH).
+			Align(lipgloss.Center).AlignVertical(lipgloss.Center).
+			Foreground(lipgloss.Color(d.theme.Blue())).
+			Render("◂")
+		chipContents = append([]string{indicator}, chipContents...)
+		chipWidths = append([]int{1}, chipWidths...)
+	}
+	if d.channel.CanScrollRight() {
+		indicator := lipgloss.NewStyle().
+			Width(1).Height(lay.ChipH).
+			Align(lipgloss.Center).AlignVertical(lipgloss.Center).
+			Foreground(lipgloss.Color(d.theme.Blue())).
+			Render("▸")
+		chipContents = append(chipContents, indicator)
+		chipWidths = append(chipWidths, 1)
+	}
+
 	channelFrame := RenderFrame(border, borderSty, chipWidths, chipContents, lay.ChipH)
 
 	// 2. Middle panels: framed 3-column layout

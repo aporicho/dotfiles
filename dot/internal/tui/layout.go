@@ -12,6 +12,7 @@ type Layout struct {
 	// Channel strip: the framed chip area at top
 	ChipW, ChipH int // per-chip content size
 	ChipCount    int  // number of columns in channel frame
+	ChipsPerRow  int  // number of chips visible at once
 
 	// Middle panel content regions (inside the frame)
 	Overview Region
@@ -34,21 +35,19 @@ func ComputeLayout(totalW, totalH, moduleCount int) Layout {
 
 	// Channel strip: N chips (modules + ADD button)
 	n := moduleCount + 1
-	lay.ChipCount = n
 
-	// Chip width: distribute total width among N chips + N+1 border chars
-	lay.ChipW = (totalW - n - 1) / n
-	if lay.ChipW < 6 {
-		lay.ChipW = 6
-	}
-
-	// Chip height: W/2 for visual square (terminal chars are ~1:2 aspect)
-	lay.ChipH = lay.ChipW / 2
-	if lay.ChipH < 3 {
-		lay.ChipH = 3
-	}
-
+	// Fixed chip dimensions
+	lay.ChipW = 8
+	lay.ChipH = 4
 	lay.ChannelFrameH = lay.ChipH + 2 // content + top/bottom border
+
+	// Calculate visible chips per row
+	chipsPerRow := (totalW - 1) / (lay.ChipW + 1)
+	if chipsPerRow < 1 {
+		chipsPerRow = 1
+	}
+	lay.ChipsPerRow = chipsPerRow
+	lay.ChipCount = n // keep total count
 
 	// Vertical budget: channelFrame + panelFrame + controls(1) + sep(1) + footer(1)
 	panelBudget := totalH - lay.ChannelFrameH - 1 - 1 - 1
