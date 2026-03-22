@@ -13,18 +13,23 @@ func (d *Dashboard) View() string {
 	lay := ComputeLayout(d.width, d.height)
 	borderSty := lipgloss.NewStyle().Foreground(lipgloss.Color(d.theme.PanelBorder()))
 
-	// Each panel builds its own Row.
 	var rows []Row
 
-	// Row 1: Channel Strip (owns its column structure)
+	// Row 1: Channel Strip
 	chipRow := d.channel.BuildRow(lay.TotalW)
 	rows = append(rows, chipRow)
 
-	// Row 2: Middle panels
-	panelRow := buildPanelRow(lay.TotalW, lay.PanelH, lay.ShowOverview, d.overview, d.scope, d.terminal)
+	// Row 2: Middle panels (uses Weight for column ratios)
+	var middlePanels []Panel
+	if lay.ShowOverview {
+		middlePanels = []Panel{d.overview, d.scope, d.terminal}
+	} else {
+		middlePanels = []Panel{d.scope, d.terminal}
+	}
+	panelRow := buildPanelRow(lay.TotalW, lay.PanelH, middlePanels)
 	rows = append(rows, panelRow)
 
-	// Row 3: Controls (aligns to panel separators)
+	// Row 3: Controls
 	if lay.ShowControls {
 		rows = append(rows, d.controls.BuildRow(lay.TotalW, panelRow))
 	}
@@ -41,35 +46,34 @@ func (d *Dashboard) View() string {
 	return RenderUnifiedFrame(borderSty, title, d.width, rows)
 }
 
-// buildPanelRow produces the middle-panel Row. It owns the column ratio logic.
-func buildPanelRow(totalW, panelH int, showOverview bool, ov *Overview, sc *Scope, tm *Terminal) Row {
-	if showOverview {
-		pw := totalW - 4 // 4 border chars for 3 columns
-		if pw < 3 {
-			pw = 3
-		}
-		ow := pw / 4
-		tw := pw / 4
-		sw := pw - ow - tw
-		cols := []int{ow, sw, tw}
-		contents := []string{
-			ov.View(ow, panelH),
-			sc.View(sw, panelH),
-			tm.View(tw, panelH),
-		}
-		return Row{Cols: cols, Contents: contents, Height: panelH}
+// buildPanelRow produces the middle-panel Row using Panel.Weight() for column ratios.
+func buildPanelRow(totalW, panelH int, panels []Panel) Row {
+	n := len(panels)
+	pw := totalW - (n + 1) // border chars
+	if pw < n {
+		pw = n
 	}
 
-	pw := totalW - 3 // 3 border chars for 2 columns
-	if pw < 2 {
-		pw = 2
+	totalWeight := 0
+	for _, p := range panels {
+		totalWeight += p.Weight()
 	}
-	sw := pw / 2
-	tw := pw - sw
-	cols := []int{sw, tw}
-	contents := []string{
-		sc.View(sw, panelH),
-		tm.View(tw, panelH),
+	if totalWeight == 0 {
+		totalWeight = n // fallback: equal weights
+	}
+
+	cols := make([]int, n)
+	used := 0
+	for i, p := range panels {
+		cols[i] = pw * p.Weight() / totalWeight
+		used += cols[i]
+	}
+	// Give rounding remainder to the middle panel.
+	cols[n/2] += pw - used
+
+	contents := make([]string, n)
+	for i, p := range panels {
+		contents[i] = p.View(cols[i], panelH)
 	}
 	return Row{Cols: cols, Contents: contents, Height: panelH}
 }
