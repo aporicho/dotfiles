@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
 )
@@ -70,4 +71,21 @@ func Pull(repoDir string) error {
 		return &GitError{Op: "pull", Output: strings.TrimSpace(out), Err: err}
 	}
 	return nil
+}
+
+// AheadBehind returns how many commits HEAD is ahead of and behind its upstream.
+// Returns (0, 0, nil) when the branch has no upstream or on any error.
+func AheadBehind(repoDir string) (ahead, behind int, err error) {
+	out, err := run(repoDir, "rev-list", "--left-right", "--count", "HEAD...@{u}")
+	if err != nil {
+		return 0, 0, nil
+	}
+	out = strings.TrimSpace(out)
+	parts := strings.Fields(out)
+	if len(parts) != 2 {
+		return 0, 0, nil
+	}
+	fmt.Sscanf(parts[0], "%d", &ahead)
+	fmt.Sscanf(parts[1], "%d", &behind)
+	return ahead, behind, nil
 }

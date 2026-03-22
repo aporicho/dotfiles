@@ -2,11 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	gitpkg "github.com/aporicho/dotfiles/dot/internal/git"
 	"github.com/aporicho/dotfiles/dot/internal/manifest"
 	"github.com/aporicho/dotfiles/dot/internal/module"
 	"github.com/aporicho/dotfiles/dot/internal/platform"
@@ -19,6 +22,7 @@ type Overview struct {
 	modules    []*module.Module
 	manifest   *manifest.Manifest
 	gitChanges []string
+	dfPath     string
 	focused    bool
 	styles     Styles
 	theme      Theme
@@ -31,11 +35,13 @@ func NewOverview(
 	gitChanges []string,
 	styles Styles,
 	theme Theme,
+	dfPath string,
 ) *Overview {
 	return &Overview{
 		modules:    modules,
 		manifest:   mf,
 		gitChanges: gitChanges,
+		dfPath:     dfPath,
 		styles:     styles,
 		theme:      theme,
 	}
@@ -84,9 +90,9 @@ func (o *Overview) renderHeader(width int) string {
 	return o.styles.Header.Render("\uf054 OVERVIEW")
 }
 
-// renderHealthBar renders a progress bar showing healthy links ratio.
+// renderHealthBar renders a progress bar showing healthy links+secrets ratio.
 func (o *Overview) renderHealthBar(width int) string {
-	total, healthy := o.linkCounts()
+	total, healthy := o.healthCounts()
 
 	var pct int
 	if total > 0 {
@@ -164,7 +170,7 @@ func (o *Overview) renderStats(width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, row1, row2)
 }
 
-// renderSystemInfo renders git branch, sync status, platform, and keychain status.
+// renderSystemInfo renders git branch, sync status, platform, shell, pkg manager, keychain, and font.
 func (o *Overview) renderSystemInfo(width int) string {
 	_ = width
 
@@ -177,11 +183,19 @@ func (o *Overview) renderSystemInfo(width int) string {
 	branch := cyan.Render("main")
 	branchLine := dimmed.Render("branch ") + branch
 
-	// Sync status: clean if no git changes.
+	// Sync status: ahead/behind upstream, or local changes count.
+	ahead, behind, _ := gitpkg.AheadBehind(o.dfPath)
 	var syncStatus string
-	if len(o.gitChanges) == 0 {
+	switch {
+	case ahead == 0 && behind == 0 && len(o.gitChanges) == 0:
 		syncStatus = green.Render("clean")
-	} else {
+	case behind > 0 && ahead > 0:
+		syncStatus = yellow.Render(fmt.Sprintf("%d behind · %d ahead", behind, ahead))
+	case behind > 0:
+		syncStatus = yellow.Render(fmt.Sprintf("%d behind", behind))
+	case ahead > 0:
+		syncStatus = yellow.Render(fmt.Sprintf("%d ahead", ahead))
+	default:
 		syncStatus = yellow.Render(fmt.Sprintf("%d change(s)", len(o.gitChanges)))
 	}
 	syncLine := dimmed.Render("sync   ") + syncStatus
@@ -189,6 +203,21 @@ func (o *Overview) renderSystemInfo(width int) string {
 	// Platform.
 	plat := platform.Current()
 	platformLine := dimmed.Render("os     ") + cyan.Render(plat)
+
+	// Shell.
+	shellPath := os.Getenv("SHELL")
+	shellName := filepath.Base(shellPath)
+	if shellName == "" || shellName == "." {
+		shellName = "unknown"
+	}
+	shellLine := dimmed.Render("shell  ") + cyan.Render(shellName)
+
+	// Package manager.
+	pkgMgr := platform.PackageManager()
+	if pkgMgr == "" {
+		pkgMgr = "none"
+	}
+	pkgLine := dimmed.Render("pkg    ") + cyan.Render(pkgMgr)
 
 	// Keychain status.
 	var keychainStatus string
@@ -199,17 +228,29 @@ func (o *Overview) renderSystemInfo(width int) string {
 	}
 	keychainLine := dimmed.Render("key    ") + keychainStatus
 
-	return strings.Join([]string{branchLine, syncLine, platformLine, keychainLine}, "\n")
+	// Font.
+	fontLine := dimmed.Render("font   ") + cyan.Render("JetBrainsMono NF")
+
+	return strings.Join([]string{branchLine, syncLine, platformLine, shellLine, pkgLine, keychainLine, fontLine}, "\n")
 }
 
-// linkCounts returns the total and healthy link counts across all modules.
-func (o *Overview) linkCounts() (total, healthy int) {
+// healthCounts returns the total and healthy counts across all module links and secrets.
+func (o *Overview) healthCounts() (total, healthy int) {
 	for _, mod := range o.modules {
-		for _, link := range mod.Links {
-			_ = link
+		for range mod.Links {
 			total++
 			if o.manifest.IsInstalled(mod.Name) {
 				healthy++
+			}
+		}
+		for _, sec := range mod.Secrets {
+			total++
+			if o.manifest.IsInstalled(mod.Name) {
+				plainPath := filepath.Join(mod.Dir, sec.Source)
+				info, err := os.Stat(plainPath)
+				if err == nil && info.Mode().Perm() == 0o600 {
+					healthy++
+				}
 			}
 		}
 	}

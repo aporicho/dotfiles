@@ -70,7 +70,7 @@ func RunDashboard(dfPath string) error {
 	}
 
 	ch := NewChannelStrip(modules, mf, gitChanges, styles, theme)
-	ov := NewOverview(modules, mf, gitChanges, styles, theme)
+	ov := NewOverview(modules, mf, gitChanges, styles, theme, dfPath)
 	sc := NewScope(firstMod, mf, gitChanges, styles, theme)
 	tm := NewTerminal(styles, theme)
 	ct := NewControls(styles, theme)
