@@ -185,33 +185,37 @@ func (cs *ChannelStrip) BuildRow(totalW int) Row {
 	cs.visibleChips = vis
 	cs.ensureVisible()
 
-	// Build column widths: N fixed-width chips + optional padding column
+	// Build column widths: N chips, last absorbs remainder (no separate padding column)
 	cols := make([]int, vis)
 	used := 0
 	for i := 0; i < vis; i++ {
 		cols[i] = chipW
 		used += chipW
 		if i > 0 {
-			used++ // separator
+			used++
 		}
 	}
-	pad := innerW - used
-	if pad > 0 {
-		cols = append(cols, pad)
+	if pad := innerW - used; pad > 0 && vis > 0 {
+		cols[vis-1] += pad
 	}
 
-	// Render visible chip contents
+	// Render visible chip contents (always at chipW, wider columns get trailing space)
 	center := lipgloss.NewStyle().Width(chipW).Align(lipgloss.Center)
-	contents := make([]string, len(cols))
+	contents := make([]string, vis)
 	for i := 0; i < vis; i++ {
 		idx := cs.scrollOffset + i
 		if idx < len(cs.modules) {
-			contents[i] = cs.renderChip(cs.modules[idx], idx, chipW, chipH, center)
+			w := chipW
+			// Last column may be wider; render chip at chipW, pad to full column width
+			if cols[i] > chipW {
+				w = cols[i]
+			}
+			chip := cs.renderChip(cs.modules[idx], idx, chipW, chipH, center)
+			if w > chipW {
+				chip = lipgloss.NewStyle().Width(w).Height(chipH).Render(chip)
+			}
+			contents[i] = chip
 		}
-	}
-	// Padding column (empty)
-	if pad > 0 {
-		contents[len(contents)-1] = lipgloss.NewStyle().Width(pad).Height(chipH).Render("")
 	}
 
 	return Row{Cols: cols, Contents: contents, Height: chipH}
