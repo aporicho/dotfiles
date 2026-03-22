@@ -1,250 +1,178 @@
 package tui
 
 import (
-	"path/filepath"
-	"strings"
-
 	tea "github.com/charmbracelet/bubbletea"
 
-	gitpkg "github.com/aporicho/dotfiles/dot/internal/git"
 	"github.com/aporicho/dotfiles/dot/internal/manifest"
 	"github.com/aporicho/dotfiles/dot/internal/module"
 )
 
-// focusable identifies which panel currently has focus.
-type focusable int
+// --- Key-to-action mappings ---
 
-const (
-	focusChannel focusable = iota
-	focusOverview
-	focusScope
-	focusTerminal
-	focusControls
-	focusCount // sentinel for wrapping
-)
+// normalKeyMap maps keys in normal mode to action names.
+var normalKeyMap = map[string]string{
+	"p": "install",
+	"P": "push",
+	"d": "doctor",
+	"x": "confirm-remove",
+}
 
-// Dashboard is the top-level bubbletea Model that composes all five panels.
+// ctrlKeyMap maps ctrl-keys in terminal input mode to action names.
+var ctrlKeyMap = map[string]string{
+	"ctrl+p":     "install",
+	"ctrl+u":     "push",
+	"ctrl+d":     "doctor",
+	"ctrl+x":     "confirm-remove",
+	"ctrl+left":  "channel-prev",
+	"ctrl+right": "channel-next",
+}
+
+// --- Dashboard ---
+
+// Dashboard is the top-level bubbletea Model. It is a pure message router:
+// it broadcasts messages to all panels and maintains only the state needed
+// for key routing (executing, confirmRemove).
 type Dashboard struct {
-	channel  *ChannelStrip
-	overview *Overview
-	scope    *Scope
-	terminal *Terminal
-	controls *Controls
+	channel  *ChannelStrip // concrete ref for Selected()/SelectedIndex()
+	overview *Overview     // concrete ref for View assembly
+	scope    *Scope        // concrete ref for View assembly
+	terminal *Terminal     // concrete ref for InputMode() check + View assembly
+	controls *Controls     // concrete ref for BuildRow + View assembly
+	panels   []Panel       // ordered list for broadcast and focus cycling
 
-	focus         focusable
+	focus         int
 	dfPath        string
 	modules       []*module.Module
 	manifest      *manifest.Manifest
 	gitChanges    []string
 	executing     bool
 	confirmRemove bool
-	width         int
-	height        int
-	styles        Styles
+	width, height int
 	theme         Theme
 }
 
 // RunDashboard is the public entry point that loads data and runs the TUI.
 func RunDashboard(dfPath string) error {
-	modules, err := module.LoadAll(filepath.Join(dfPath, "modules"))
-	if err != nil {
-		modules = nil // degrade gracefully with no modules
-	}
-
-	mfPath, err := manifest.DefaultPath()
-	if err != nil {
-		return err
-	}
-	mf, err := manifest.Load(mfPath)
-	if err != nil {
-		return err
-	}
-
-	gitChanges, _ := gitpkg.Status(dfPath)
-
 	theme := DetectTheme()
-	styles := NewStyles(theme)
 
-	var firstMod *module.Module
-	if len(modules) > 0 {
-		firstMod = modules[0]
-	}
-
-	ch := NewChannelStrip(modules, mf, gitChanges, styles, theme)
-	ov := NewOverview(modules, mf, gitChanges, styles, theme, dfPath)
-	sc := NewScope(firstMod, mf, gitChanges, styles, theme)
-	tm := NewTerminal(styles, theme)
-	ct := NewControls(styles, theme)
+	ch := NewChannelStrip(theme)
+	ov := NewOverview(theme, dfPath)
+	sc := NewScope(theme)
+	tm := NewTerminal(theme)
+	ct := NewControls(theme)
 
 	// Channel strip starts focused.
 	ch.SetFocus(true)
 
 	d := &Dashboard{
-		channel:    ch,
-		overview:   ov,
-		scope:      sc,
-		terminal:   tm,
-		controls:   ct,
-		focus:      focusChannel,
-		dfPath:     dfPath,
-		modules:    modules,
-		manifest:   mf,
-		gitChanges: gitChanges,
-		styles:     styles,
-		theme:      theme,
+		channel:  ch,
+		overview: ov,
+		scope:    sc,
+		terminal: tm,
+		controls: ct,
+		panels:   []Panel{ch, ov, sc, tm, ct},
+		focus:    0, // channel
+		dfPath:   dfPath,
+		theme:    theme,
 	}
 
 	p := tea.NewProgram(d, tea.WithAltScreen())
-	_, err = p.Run()
+	_, err := p.Run()
 	return err
 }
 
-// Init implements tea.Model. Fires the initial module selection.
+// Init implements tea.Model. Triggers initial data load.
 func (d *Dashboard) Init() tea.Cmd {
-	if len(d.modules) == 0 {
-		return nil
-	}
-	mod := d.channel.Selected()
-	idx := d.channel.SelectedIndex()
-	return func() tea.Msg {
-		return ModuleSelectedMsg{Index: idx, Module: mod}
-	}
+	return reloadData(d.dfPath)
 }
 
 // Update implements tea.Model.
 func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m := msg.(type) {
 	case tea.WindowSizeMsg:
-		d.width = m.Width
-		d.height = m.Height
+		d.width, d.height = m.Width, m.Height
 		return d, nil
-
 	case tea.KeyMsg:
 		return d.handleKey(m)
+	case TerminalExecMsg:
+		return d.handleTerminalExec(m)
+	default:
+		return d.broadcast(msg)
+	}
+}
 
-	case ModuleSelectedMsg:
-		var cmd tea.Cmd
-		_, cmd = d.scope.Update(m)
-		return d, cmd
+// broadcast sends a message to all panels and updates dashboard-level state.
+func (d *Dashboard) broadcast(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
 
+	// Dashboard-level state flags (needed for key routing).
+	switch msg.(type) {
 	case CmdStartMsg:
 		d.executing = true
-		_, cmd := d.controls.Update(m)
-		return d, cmd
-
 	case CmdOutputMsg:
 		d.executing = false
-		var cmds []tea.Cmd
-		_, cmd1 := d.terminal.Update(m)
-		cmds = append(cmds, cmd1)
-		_, cmd2 := d.controls.Update(m)
-		cmds = append(cmds, cmd2)
 		cmds = append(cmds, reloadData(d.dfPath))
-		return d, tea.Batch(cmds...)
-
-	case DataReloadMsg:
+	case ConfirmStartMsg:
+		d.confirmRemove = true
+	case ConfirmCancelMsg:
+		d.confirmRemove = false
+	}
+	if m, ok := msg.(DataReloadMsg); ok {
 		d.modules = m.Modules
 		d.manifest = m.Manifest
 		d.gitChanges = m.GitChanges
-		// Refresh the channel strip with new data.
-		d.channel = NewChannelStrip(m.Modules, m.Manifest, m.GitChanges, d.styles, d.theme)
-		d.channel.SetFocus(d.focus == focusChannel)
-		d.overview.Update(m)
-		d.scope.Update(m)
-		return d, nil
-
-	case TerminalExecMsg:
-		return d.handleTerminalExec(m)
 	}
 
-	return d, nil
+	// Broadcast to all panels.
+	for i, p := range d.panels {
+		updated, cmd := p.Update(msg)
+		d.panels[i] = updated
+		cmds = append(cmds, cmd)
+	}
+
+	// Keep concrete refs in sync with panels slice.
+	d.syncPanelRefs()
+
+	return d, tea.Batch(cmds...)
 }
 
-// handleKey routes key messages based on focus and state.
+// broadcastAndExec broadcasts a message and batches it with an async command.
+func (d *Dashboard) broadcastAndExec(msg tea.Msg, cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	_, bcmd := d.broadcast(msg)
+	return d, tea.Batch(bcmd, cmd)
+}
+
+// syncPanelRefs updates concrete panel references after broadcast mutates the slice.
+// Panel.Update returns Panel (interface), so after reassignment the concrete
+// pointer in the slice may differ from the stored field.
+func (d *Dashboard) syncPanelRefs() {
+	for _, p := range d.panels {
+		switch v := p.(type) {
+		case *ChannelStrip:
+			d.channel = v
+		case *Overview:
+			d.overview = v
+		case *Scope:
+			d.scope = v
+		case *Terminal:
+			d.terminal = v
+		case *Controls:
+			d.controls = v
+		}
+	}
+}
+
+// --- Key handling ---
+
 func (d *Dashboard) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := m.String()
 
-	// When terminal is focused and in input mode, intercept Ctrl keys first.
-	if d.focus == focusTerminal && d.terminal.InputMode() {
-		switch key {
-		case "ctrl+left":
-			_, cmd := d.channel.Update(tea.KeyMsg{Type: tea.KeyLeft})
-			return d, cmd
-		case "ctrl+right":
-			_, cmd := d.channel.Update(tea.KeyMsg{Type: tea.KeyRight})
-			return d, cmd
-		case "ctrl+p":
-			mod := d.channel.Selected()
-			if mod == nil {
-				return d, nil
-			}
-			d.executing = true
-			d.controls.SetExecuting(true)
-			return d, tea.Batch(
-				func() tea.Msg { return CmdStartMsg{} },
-				execInstall(d.dfPath, mod.Name),
-			)
-		case "ctrl+u": // push (upload) — Ctrl+Shift+P is indistinguishable from Ctrl+P
-			d.executing = true
-			d.controls.SetExecuting(true)
-			return d, tea.Batch(
-				func() tea.Msg { return CmdStartMsg{} },
-				execPush(d.dfPath, "tui push"),
-			)
-		case "ctrl+d":
-			mod := d.channel.Selected()
-			if mod == nil {
-				return d, nil
-			}
-			d.executing = true
-			d.controls.SetExecuting(true)
-			return d, tea.Batch(
-				func() tea.Msg { return CmdStartMsg{} },
-				execDoctor(d.dfPath, mod.Name),
-			)
-		case "ctrl+x":
-			mod := d.channel.Selected()
-			if mod == nil {
-				return d, nil
-			}
-			d.confirmRemove = true
-			d.controls.SetConfirming(true)
-			d.controls.SetConfirmName(mod.Name)
-			return d, nil
-		case "ctrl+a":
-			d.terminal.AppendOutput("提示：请使用 dot add <module> 添加模块")
-			return d, nil
-		case "ctrl+q", "ctrl+c":
-			return d, tea.Quit
-		}
-		// All other keys go to terminal
-		_, cmd := d.terminal.Update(m)
-		return d, cmd
-	}
-
-	// Handle remove confirmation mode
+	// Confirm mode: only y/n/esc
 	if d.confirmRemove {
-		switch key {
-		case "y", "Y":
-			d.confirmRemove = false
-			d.controls.SetConfirming(false)
-			mod := d.channel.Selected()
-			if mod != nil {
-				d.executing = true
-				d.controls.SetExecuting(true)
-				return d, tea.Batch(
-					func() tea.Msg { return CmdStartMsg{} },
-					execUninstall(d.dfPath, mod.Name),
-				)
-			}
-		case "n", "N", "esc":
-			d.confirmRemove = false
-			d.controls.SetConfirming(false)
-		}
-		return d, nil
+		return d.handleConfirmKey(key)
 	}
 
-	// When executing, only allow quit.
+	// Executing: only quit
 	if d.executing {
 		if key == "q" || key == "ctrl+c" {
 			return d, tea.Quit
@@ -252,185 +180,128 @@ func (d *Dashboard) handleKey(m tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return d, nil
 	}
 
+	// Terminal input mode: ctrl keys -> actions, rest -> terminal
+	if d.terminal.InputMode() && d.panels[d.focus] == d.terminal {
+		if action, ok := ctrlKeyMap[key]; ok {
+			return d.execAction(action)
+		}
+		if key == "ctrl+a" {
+			return d.broadcast(TerminalHintMsg{Text: "提示：请使用 dot add <module> 添加模块"})
+		}
+		if key == "ctrl+q" || key == "ctrl+c" {
+			return d, tea.Quit
+		}
+		// All other keys go to terminal.
+		_, cmd := d.terminal.Update(m)
+		return d, cmd
+	}
+
+	// Normal mode: check action map first
+	if action, ok := normalKeyMap[key]; ok {
+		return d.execAction(action)
+	}
+
 	switch key {
 	case "q", "ctrl+c":
 		return d, tea.Quit
-
 	case "left", "h", "right", "l":
 		_, cmd := d.channel.Update(m)
 		return d, cmd
-
 	case "tab":
 		d.cycleFocus()
 		return d, nil
-
-	case "p":
-		mod := d.channel.Selected()
-		if mod == nil {
-			return d, nil
-		}
-		d.executing = true
-		d.controls.SetExecuting(true)
-		return d, tea.Batch(
-			func() tea.Msg { return CmdStartMsg{} },
-			execInstall(d.dfPath, mod.Name),
-		)
-
-	case "P":
-		d.executing = true
-		d.controls.SetExecuting(true)
-		return d, tea.Batch(
-			func() tea.Msg { return CmdStartMsg{} },
-			execPush(d.dfPath, "tui push"),
-		)
-
-	case "d":
-		mod := d.channel.Selected()
-		if mod == nil {
-			return d, nil
-		}
-		d.executing = true
-		d.controls.SetExecuting(true)
-		return d, tea.Batch(
-			func() tea.Msg { return CmdStartMsg{} },
-			execDoctor(d.dfPath, mod.Name),
-		)
-
-	case "x":
-		mod := d.channel.Selected()
-		if mod == nil {
-			return d, nil
-		}
-		d.confirmRemove = true
-		d.controls.SetConfirming(true)
-		d.controls.SetConfirmName(mod.Name)
-		return d, nil
-
 	case "a":
-		d.terminal.AppendOutput("提示：请使用 dot add <module> 添加模块")
-		return d, nil
-
+		return d.broadcast(TerminalHintMsg{Text: "提示：请使用 dot add <module> 添加模块"})
 	case ":":
-		d.setFocus(focusTerminal)
+		d.setFocus(d.panelIndex(d.terminal))
 		_, cmd := d.terminal.Update(m)
 		return d, cmd
-
 	case "esc":
-		// Return focus to channel strip.
-		d.setFocus(focusChannel)
+		d.setFocus(0) // channel is always index 0
 		return d, nil
 	}
 
 	return d, nil
 }
 
-// handleTerminalExec parses a terminal command and dispatches the appropriate action.
-func (d *Dashboard) handleTerminalExec(m TerminalExecMsg) (tea.Model, tea.Cmd) {
-	parts := strings.Fields(m.Input)
-	if len(parts) == 0 {
-		return d, nil
+func (d *Dashboard) handleConfirmKey(key string) (tea.Model, tea.Cmd) {
+	switch key {
+	case "y", "Y":
+		mod := d.channel.Selected()
+		if mod != nil {
+			return d.broadcastAndExec(ConfirmCancelMsg{}, execUninstall(d.dfPath, mod.Name))
+		}
+		return d.broadcast(ConfirmCancelMsg{})
+	case "n", "N", "esc":
+		return d.broadcast(ConfirmCancelMsg{})
 	}
-
-	cmd := parts[0]
-	args := parts[1:]
-
-	switch cmd {
-	case "install":
-		modName := ""
-		if len(args) > 0 {
-			modName = args[0]
-		} else if mod := d.channel.Selected(); mod != nil {
-			modName = mod.Name
-		}
-		if modName == "" {
-			d.terminal.AppendOutput("错误：未指定模块")
-			return d, nil
-		}
-		d.executing = true
-		d.controls.SetExecuting(true)
-		return d, execInstall(d.dfPath, modName)
-
-	case "pull":
-		d.executing = true
-		d.controls.SetExecuting(true)
-		return d, execPull(d.dfPath)
-
-	case "push":
-		msg := "tui push"
-		if len(args) > 0 {
-			msg = strings.Join(args, " ")
-		}
-		d.executing = true
-		d.controls.SetExecuting(true)
-		return d, execPush(d.dfPath, msg)
-
-	case "doctor":
-		modName := ""
-		if len(args) > 0 {
-			modName = args[0]
-		} else if mod := d.channel.Selected(); mod != nil {
-			modName = mod.Name
-		}
-		if modName == "" {
-			d.terminal.AppendOutput("错误：未指定模块")
-			return d, nil
-		}
-		d.executing = true
-		d.controls.SetExecuting(true)
-		return d, execDoctor(d.dfPath, modName)
-
-	case "uninstall":
-		modName := ""
-		if len(args) > 0 {
-			modName = args[0]
-		} else if mod := d.channel.Selected(); mod != nil {
-			modName = mod.Name
-		}
-		if modName == "" {
-			d.terminal.AppendOutput("错误：未指定模块")
-			return d, nil
-		}
-		d.executing = true
-		d.controls.SetExecuting(true)
-		return d, execUninstall(d.dfPath, modName)
-
-	case "remove":
-		d.terminal.AppendOutput("请使用 dot remove <module> 命令行操作（不可逆操作，TUI 不支持）")
-		return d, nil
-
-	default:
-		d.terminal.AppendOutput("未知命令: " + m.Input)
-		return d, nil
-	}
+	return d, nil
 }
 
-// cycleFocus moves focus to the next panel in order.
+// execAction dispatches a named action from the key maps.
+func (d *Dashboard) execAction(action string) (tea.Model, tea.Cmd) {
+	mod := d.channel.Selected()
+	switch action {
+	case "install":
+		if mod == nil {
+			return d, nil
+		}
+		return d.broadcastAndExec(CmdStartMsg{}, execInstall(d.dfPath, mod.Name))
+	case "push":
+		return d.broadcastAndExec(CmdStartMsg{}, execPush(d.dfPath, "tui push"))
+	case "doctor":
+		if mod == nil {
+			return d, nil
+		}
+		return d.broadcastAndExec(CmdStartMsg{}, execDoctor(d.dfPath, mod.Name))
+	case "confirm-remove":
+		if mod == nil {
+			return d, nil
+		}
+		return d.broadcast(ConfirmStartMsg{ModuleName: mod.Name})
+	case "channel-prev":
+		_, cmd := d.channel.Update(tea.KeyMsg{Type: tea.KeyLeft})
+		return d, cmd
+	case "channel-next":
+		_, cmd := d.channel.Update(tea.KeyMsg{Type: tea.KeyRight})
+		return d, cmd
+	}
+	return d, nil
+}
+
+// handleTerminalExec uses the extracted command dispatcher.
+func (d *Dashboard) handleTerminalExec(m TerminalExecMsg) (tea.Model, tea.Cmd) {
+	cmds, msgs, errText := dispatchCommand(m.Input, d.dfPath, d.channel.Selected())
+	if errText != "" {
+		msgs = append(msgs, TerminalHintMsg{Text: errText})
+	}
+	var allCmds []tea.Cmd
+	for _, msg := range msgs {
+		_, cmd := d.broadcast(msg)
+		allCmds = append(allCmds, cmd)
+	}
+	allCmds = append(allCmds, cmds...)
+	return d, tea.Batch(allCmds...)
+}
+
+// --- Focus management ---
+
 func (d *Dashboard) cycleFocus() {
-	next := (d.focus + 1) % focusCount
+	next := (d.focus + 1) % len(d.panels)
 	d.setFocus(next)
 }
 
-// setFocus switches focus to the given panel, unfocusing the previous one.
-func (d *Dashboard) setFocus(f focusable) {
-	d.panelAt(d.focus).SetFocus(false)
-	d.focus = f
-	d.panelAt(d.focus).SetFocus(true)
+func (d *Dashboard) setFocus(idx int) {
+	d.panels[d.focus].SetFocus(false)
+	d.focus = idx
+	d.panels[d.focus].SetFocus(true)
 }
 
-// panelAt returns the Panel for the given focusable index.
-func (d *Dashboard) panelAt(f focusable) Panel {
-	switch f {
-	case focusChannel:
-		return d.channel
-	case focusOverview:
-		return d.overview
-	case focusScope:
-		return d.scope
-	case focusTerminal:
-		return d.terminal
-	case focusControls:
-		return d.controls
-	default:
-		return d.channel
+func (d *Dashboard) panelIndex(target Panel) int {
+	for i, p := range d.panels {
+		if p == target {
+			return i
+		}
 	}
+	return 0
 }
