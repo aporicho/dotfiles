@@ -266,7 +266,7 @@ func (cs *ChannelStrip) renderChip(mod *module.Module, idx, chipW, chipH int, ce
 	case !matchesPlatform:
 		nameLine = lipgloss.NewStyle().Foreground(lipgloss.Color(cs.theme.Dimmed())).Render(name)
 	case isSelected:
-		nameLine = lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true).Render(name)
+		nameLine = lipgloss.NewStyle().Foreground(lipgloss.Color(cs.theme.Blue())).Bold(true).Render(name)
 	default:
 		nameLine = name
 	}
@@ -283,21 +283,11 @@ func (cs *ChannelStrip) renderChip(mod *module.Module, idx, chipW, chipH int, ce
 
 	inner := centerStyle.Render(nameLine) + "\n" + centerStyle.Render(indicators.String())
 
-	// Background fill: selected gets blue bg, unselected gets subtle gray bg.
-	chipStyle := lipgloss.NewStyle().
+	return lipgloss.NewStyle().
 		Width(chipW).Height(chipH).
 		Align(lipgloss.Center).
-		AlignVertical(lipgloss.Center)
-	switch {
-	case !matchesPlatform:
-		// No fill for cross-platform dimmed chips.
-	case isSelected:
-		chipStyle = chipStyle.Background(lipgloss.Color(cs.theme.Blue()))
-	default:
-		chipStyle = chipStyle.Background(lipgloss.Color(cs.theme.Dimmed()))
-	}
-
-	return chipStyle.Render(inner)
+		AlignVertical(lipgloss.Center).
+		Render(inner)
 }
 
 
