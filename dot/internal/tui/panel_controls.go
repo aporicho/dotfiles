@@ -101,10 +101,13 @@ func (c *Controls) renderCells(cols []int) []string {
 	for i := range cols {
 		if i < len(buttons) {
 			b := buttons[i]
-			color := lipgloss.NewStyle().Foreground(lipgloss.Color(b.color))
-			dim := lipgloss.NewStyle().Foreground(lipgloss.Color(c.theme.Dimmed()))
-			text := fmt.Sprintf("%s %s", color.Render(b.icon+" "+b.label), dim.Render(b.key))
-			cells[i] = lipgloss.NewStyle().Width(cols[i]).Align(lipgloss.Center).Render(text)
+			text := fmt.Sprintf("%s %s %s", b.icon, b.label, b.key)
+			cells[i] = lipgloss.NewStyle().
+				Width(cols[i]).
+				Align(lipgloss.Center).
+				Background(lipgloss.Color(b.color)).
+				Foreground(lipgloss.Color("15")).
+				Render(text)
 		} else {
 			cells[i] = lipgloss.NewStyle().Width(cols[i]).Render("")
 		}
