@@ -16,8 +16,8 @@ import (
 func execPull(dfPath, modName string) tea.Cmd {
 	return func() tea.Msg {
 		var buf bytes.Buffer
-		fmt.Fprintf(&buf, "$ dot pull %s\n", modName)
-		err := ops.PullModule(dfPath, modName, &buf)
+		fmt.Fprintf(&buf, "$ dot install %s\n", modName)
+		err := ops.InstallModule(dfPath, modName, &buf)
 		return CmdOutputMsg{Output: buf.String(), Err: err}
 	}
 }
