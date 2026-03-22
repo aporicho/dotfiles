@@ -17,8 +17,8 @@ type Controls struct {
 	theme       Theme
 }
 
-func NewControls(styles Styles, theme Theme) *Controls {
-	return &Controls{styles: styles, theme: theme}
+func NewControls(theme Theme) *Controls {
+	return &Controls{styles: NewStyles(theme), theme: theme}
 }
 
 func (c *Controls) Focused() bool  { return c.focused }
@@ -27,16 +27,18 @@ func (c *Controls) SetFocus(f bool) { c.focused = f }
 // Weight implements Panel.
 func (c *Controls) Weight() int { return 0 }
 
-func (c *Controls) SetExecuting(v bool)   { c.executing = v }
-func (c *Controls) SetConfirming(v bool)  { c.confirming = v }
-func (c *Controls) SetConfirmName(n string) { c.confirmName = n }
-
 func (c *Controls) Update(msg tea.Msg) (Panel, tea.Cmd) {
-	switch msg.(type) {
+	switch m := msg.(type) {
 	case CmdStartMsg:
 		c.executing = true
 	case CmdOutputMsg:
 		c.executing = false
+	case ConfirmStartMsg:
+		c.confirming = true
+		c.confirmName = m.ModuleName
+	case ConfirmCancelMsg:
+		c.confirming = false
+		c.confirmName = ""
 	}
 	return c, nil
 }
