@@ -142,8 +142,7 @@ func (cs *ChannelStrip) CanScrollLeft() bool { return cs.scrollOffset > 0 }
 
 // CanScrollRight reports whether there are chips scrolled off to the right.
 func (cs *ChannelStrip) CanScrollRight() bool {
-	total := len(cs.modules) + 1 // modules + ADD
-	return cs.scrollOffset+cs.visibleChips < total
+	return cs.scrollOffset+cs.visibleChips < len(cs.modules)
 }
 
 // emitSelected returns a Cmd that sends a ModuleSelectedMsg for the current selection.
@@ -183,20 +182,11 @@ func (cs *ChannelStrip) ChipContents(colWidths []int) []string {
 	// Build all chips at standard width first
 	const stdW = 8
 	stdCenter := lipgloss.NewStyle().Width(stdW).Align(lipgloss.Center)
-	all := make([]string, 0, len(cs.modules)+1)
+	all := make([]string, 0, len(cs.modules))
 
 	for i, mod := range cs.modules {
 		all = append(all, cs.renderChip(mod, i, stdW, chipH, stdCenter))
 	}
-
-	// ADD chip
-	dimmed := lipgloss.NewStyle().Foreground(lipgloss.Color(cs.theme.Dimmed()))
-	addContent := lipgloss.NewStyle().
-		Width(stdW).Height(chipH).
-		Align(lipgloss.Center).
-		AlignVertical(lipgloss.Center).
-		Render(dimmed.Render("+ ADD") + "\n" + dimmed.Render("a"))
-	all = append(all, addContent)
 
 	// Slice to the visible window
 	start := cs.scrollOffset
@@ -222,13 +212,6 @@ func (cs *ChannelStrip) ChipContents(colWidths []int) []string {
 			if idx < len(cs.modules) {
 				center := lipgloss.NewStyle().Width(cw).Align(lipgloss.Center)
 				visible[i] = cs.renderChip(cs.modules[idx], idx, cw, chipH, center)
-			} else {
-				// ADD chip with different width
-				visible[i] = lipgloss.NewStyle().
-					Width(cw).Height(chipH).
-					Align(lipgloss.Center).
-					AlignVertical(lipgloss.Center).
-					Render(dimmed.Render("+ ADD") + "\n" + dimmed.Render("a"))
 			}
 		}
 	}
@@ -309,7 +292,7 @@ func (cs *ChannelStrip) renderChip(mod *module.Module, idx, chipW, chipH int, ce
 		Render(inner)
 }
 
-// ChipCount returns the total number of chips (modules + ADD).
+// ChipCount returns the total number of chips.
 func (cs *ChannelStrip) ChipCount() int {
-	return len(cs.modules) + 1
+	return len(cs.modules)
 }

@@ -69,7 +69,7 @@ func ComputeLayout(totalW, totalH, moduleCount int) Layout {
 	if maxChips < 1 {
 		maxChips = 1
 	}
-	totalChips := moduleCount + 1 // modules + ADD
+	totalChips := moduleCount
 	visCols := totalChips
 	if visCols > maxChips {
 		visCols = maxChips
