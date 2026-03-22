@@ -33,10 +33,10 @@ type Terminal struct {
 }
 
 // NewTerminal constructs a Terminal panel.
-func NewTerminal(styles Styles, theme Theme) *Terminal {
+func NewTerminal(theme Theme) *Terminal {
 	vp := viewport.New(0, 0)
 	return &Terminal{
-		styles:       styles,
+		styles:       NewStyles(theme),
 		theme:        theme,
 		viewport:     vp,
 		historyIndex: -1,
@@ -55,8 +55,8 @@ func (t *Terminal) Weight() int { return 2 }
 // InputMode reports whether the terminal is currently in command-input mode.
 func (t *Terminal) InputMode() bool { return t.inputMode }
 
-// AppendOutput adds lines to the terminal output history programmatically.
-func (t *Terminal) AppendOutput(text string) {
+// appendOutput adds lines to the terminal output history.
+func (t *Terminal) appendOutput(text string) {
 	for _, line := range strings.Split(text, "\n") {
 		t.lines = append(t.lines, outputLine{text: line, timestamp: time.Now()})
 	}
@@ -106,6 +106,10 @@ func (t *Terminal) Update(msg tea.Msg) (Panel, tea.Cmd) {
 		}
 		t.syncViewport()
 		t.viewport.GotoBottom()
+		return t, nil
+
+	case TerminalHintMsg:
+		t.appendOutput(m.Text)
 		return t, nil
 
 	case tea.KeyMsg:
