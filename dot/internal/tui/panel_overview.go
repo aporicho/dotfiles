@@ -28,22 +28,12 @@ type Overview struct {
 	theme      Theme
 }
 
-// NewOverview constructs an Overview panel.
-func NewOverview(
-	modules []*module.Module,
-	mf *manifest.Manifest,
-	gitChanges []string,
-	styles Styles,
-	theme Theme,
-	dfPath string,
-) *Overview {
+// NewOverview constructs an Overview panel. Data arrives via DataReloadMsg.
+func NewOverview(theme Theme, dfPath string) *Overview {
 	return &Overview{
-		modules:    modules,
-		manifest:   mf,
-		gitChanges: gitChanges,
-		dfPath:     dfPath,
-		styles:     styles,
-		theme:      theme,
+		dfPath: dfPath,
+		styles: NewStyles(theme),
+		theme:  theme,
 	}
 }
 

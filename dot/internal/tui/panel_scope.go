@@ -24,20 +24,11 @@ type Scope struct {
 	theme      Theme
 }
 
-// NewScope constructs a Scope panel.
-func NewScope(
-	mod *module.Module,
-	mf *manifest.Manifest,
-	gitChanges []string,
-	styles Styles,
-	theme Theme,
-) *Scope {
+// NewScope constructs a Scope panel. Data arrives via DataReloadMsg and ModuleSelectedMsg.
+func NewScope(theme Theme) *Scope {
 	return &Scope{
-		module:     mod,
-		manifest:   mf,
-		gitChanges: gitChanges,
-		styles:     styles,
-		theme:      theme,
+		styles: NewStyles(theme),
+		theme:  theme,
 	}
 }
 
