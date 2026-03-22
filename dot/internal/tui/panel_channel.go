@@ -183,6 +183,11 @@ func (cs *ChannelStrip) BuildRow(totalW int) Row {
 	cs.visibleChips = vis
 	cs.ensureVisible()
 
+	// No modules yet (first frame before DataReloadMsg) — single empty column.
+	if vis == 0 {
+		return Row{Cols: []int{innerW}, Contents: []string{""}, Height: chipH}
+	}
+
 	// All chips are fixed chipW. Remainder becomes a separate empty column.
 	chipsUsed := vis*chipW + max(vis-1, 0) // chips + separators between them
 	pad := innerW - chipsUsed
