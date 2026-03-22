@@ -21,8 +21,12 @@ func NewControls(styles Styles, theme Theme) *Controls {
 	return &Controls{styles: styles, theme: theme}
 }
 
-func (c *Controls) Focused() bool        { return c.focused }
-func (c *Controls) SetFocus(f bool)       { c.focused = f }
+func (c *Controls) Focused() bool  { return c.focused }
+func (c *Controls) SetFocus(f bool) { c.focused = f }
+
+// Weight implements Panel.
+func (c *Controls) Weight() int { return 0 }
+
 func (c *Controls) SetExecuting(v bool)   { c.executing = v }
 func (c *Controls) SetConfirming(v bool)  { c.confirming = v }
 func (c *Controls) SetConfirmName(n string) { c.confirmName = n }

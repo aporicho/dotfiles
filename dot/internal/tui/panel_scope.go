@@ -47,6 +47,9 @@ func (s *Scope) Focused() bool { return s.focused }
 // SetFocus implements Panel.
 func (s *Scope) SetFocus(f bool) { s.focused = f }
 
+// Weight implements Panel.
+func (s *Scope) Weight() int { return 2 }
+
 // Update implements Panel.
 func (s *Scope) Update(msg tea.Msg) (Panel, tea.Cmd) {
 	switch m := msg.(type) {

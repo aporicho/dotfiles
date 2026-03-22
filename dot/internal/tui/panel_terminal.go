@@ -49,6 +49,9 @@ func (t *Terminal) Focused() bool { return t.focused }
 // SetFocus implements Panel.
 func (t *Terminal) SetFocus(f bool) { t.focused = f }
 
+// Weight implements Panel.
+func (t *Terminal) Weight() int { return 2 }
+
 // InputMode reports whether the terminal is currently in command-input mode.
 func (t *Terminal) InputMode() bool { return t.inputMode }
 
