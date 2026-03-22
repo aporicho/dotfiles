@@ -94,8 +94,8 @@ func buildContentRow(b borderSet, sty lipgloss.Style, cols []int, contentLines [
 		if row < len(contentLines[i]) {
 			line = contentLines[i][row]
 		}
-		// Pad to column width (in case content is short)
-		_ = w // width enforcement is done by the panel's View method
+		// Frame enforces column width — panels don't need to worry about it.
+		line = lipgloss.NewStyle().Width(w).Render(line)
 		buf.WriteString(line)
 	}
 

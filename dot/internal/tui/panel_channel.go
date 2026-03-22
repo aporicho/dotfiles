@@ -199,17 +199,14 @@ func (cs *ChannelStrip) BuildRow(totalW int) Row {
 		cols[vis-1] += pad
 	}
 
-	// Render visible chip contents at fixed chipW; pad wider columns with spaces per line
+	// Render visible chip contents at fixed chipW.
+	// Frame enforces column width, so chips don't need to pad themselves.
 	center := lipgloss.NewStyle().Width(chipW).Align(lipgloss.Center)
 	contents := make([]string, vis)
 	for i := 0; i < vis; i++ {
 		idx := cs.scrollOffset + i
 		if idx < len(cs.modules) {
-			chip := cs.renderChip(cs.modules[idx], idx, chipW, chipH, center)
-			if extra := cols[i] - chipW; extra > 0 {
-				chip = padRight(chip, extra, chipH)
-			}
-			contents[i] = chip
+			contents[i] = cs.renderChip(cs.modules[idx], idx, chipW, chipH, center)
 		}
 	}
 
@@ -283,17 +280,4 @@ func (cs *ChannelStrip) renderChip(mod *module.Module, idx, chipW, chipH int, ce
 		Render(inner)
 }
 
-// padRight appends spaces to each line of a rendered block without changing its visual width.
-func padRight(block string, extra int, height int) string {
-	lines := strings.Split(block, "\n")
-	pad := strings.Repeat(" ", extra)
-	for i := range lines {
-		lines[i] += pad
-	}
-	// Ensure exactly height lines
-	for len(lines) < height {
-		lines = append(lines, strings.Repeat(" ", extra))
-	}
-	return strings.Join(lines[:height], "\n")
-}
 
