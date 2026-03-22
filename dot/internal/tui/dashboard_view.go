@@ -8,8 +8,8 @@ import (
 
 // View implements tea.Model.
 func (d *Dashboard) View() string {
-	if d.width < 80 || d.height < 24 {
-		return "终端过小，请调整窗口大小（至少 80×24）"
+	if d.width < 60 || d.height < 12 {
+		return "终端过小，请调整窗口大小（至少 60×12）"
 	}
 
 	lay := ComputeLayout(d.width, d.height, len(d.modules))
@@ -46,13 +46,22 @@ func (d *Dashboard) View() string {
 
 	channelFrame := RenderFrame(border, borderSty, chipWidths, chipContents, lay.ChipH)
 
-	// 2. Middle panels: framed 3-column layout
-	overviewContent := d.overview.View(lay.Overview.W, lay.PanelInnerH)
-	scopeContent := d.scope.View(lay.Scope.W, lay.PanelInnerH)
-	terminalContent := d.terminal.View(lay.Terminal.W, lay.PanelInnerH)
+	// 2. Middle panels
+	var panelWidths []int
+	var panelContents []string
 
-	panelWidths := []int{lay.Overview.W, lay.Scope.W, lay.Terminal.W}
-	panelContents := []string{overviewContent, scopeContent, terminalContent}
+	if lay.ShowOverview {
+		overviewContent := d.overview.View(lay.Overview.W, lay.PanelInnerH)
+		scopeContent := d.scope.View(lay.Scope.W, lay.PanelInnerH)
+		terminalContent := d.terminal.View(lay.Terminal.W, lay.PanelInnerH)
+		panelWidths = []int{lay.Overview.W, lay.Scope.W, lay.Terminal.W}
+		panelContents = []string{overviewContent, scopeContent, terminalContent}
+	} else {
+		scopeContent := d.scope.View(lay.Scope.W, lay.PanelInnerH)
+		terminalContent := d.terminal.View(lay.Terminal.W, lay.PanelInnerH)
+		panelWidths = []int{lay.Scope.W, lay.Terminal.W}
+		panelContents = []string{scopeContent, terminalContent}
+	}
 	panelFrame := RenderFrame(border, borderSty, panelWidths, panelContents, lay.PanelInnerH)
 
 	// 3. Controls (borderless)
@@ -64,13 +73,16 @@ func (d *Dashboard) View() string {
 	// 5. Footer
 	footer := d.renderFooter()
 
-	return lipgloss.JoinVertical(lipgloss.Left,
-		channelFrame,
-		panelFrame,
-		controlsView,
-		sep,
-		footer,
-	)
+	// Assemble
+	parts := []string{channelFrame, panelFrame}
+	if lay.ShowControls {
+		parts = append(parts, controlsView)
+	}
+	parts = append(parts, sep)
+	if lay.ShowFooter {
+		parts = append(parts, footer)
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 // renderFooter renders the key-hint bar at the very bottom.
