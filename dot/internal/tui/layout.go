@@ -112,19 +112,42 @@ func ComputeLayout(totalW, totalH, moduleCount int) Layout {
 		lay.PanelCols = []int{sw, tw}
 	}
 
-	// --- Controls columns (4 buttons) ---
-	// inner = totalW - 2 borders - 3 internal separators = totalW - 5
-	cw := totalW - 5
-	if cw < 4 {
-		cw = 4
-	}
-	bw := cw / 4
-	cr := cw - bw*4
-	lay.CtrlCols = make([]int, 4)
-	for i := 0; i < 4; i++ {
-		lay.CtrlCols[i] = bw
-		if i < cr {
-			lay.CtrlCols[i]++
+	// --- Controls columns (4 buttons, aligned to panel separators) ---
+	// Button separators must align with panel separators so ┼ connectors work.
+	// With 3 panels [ow, sw, tw]: btn1=ow, btn2+btn3 split sw, btn4=tw.
+	// With 2 panels [sw, tw]: btn1+btn2 split sw, btn3+btn4 split tw.
+	if lay.ShowOverview && len(lay.PanelCols) == 3 {
+		ow := lay.PanelCols[0]
+		sw := lay.PanelCols[1]
+		tw := lay.PanelCols[2]
+		// Split Scope column into two halves for buttons 2 and 3
+		// sw contains the content width; splitting it needs to account for
+		// the extra separator: btn2 + 1(sep) + btn3 = sw
+		left := (sw - 1) / 2
+		right := sw - 1 - left
+		lay.CtrlCols = []int{ow, left, right, tw}
+	} else if len(lay.PanelCols) == 2 {
+		sw := lay.PanelCols[0]
+		tw := lay.PanelCols[1]
+		left1 := (sw - 1) / 2
+		right1 := sw - 1 - left1
+		left2 := (tw - 1) / 2
+		right2 := tw - 1 - left2
+		lay.CtrlCols = []int{left1, right1, left2, right2}
+	} else {
+		// Fallback: equal split
+		cw := totalW - 5
+		if cw < 4 {
+			cw = 4
+		}
+		bw := cw / 4
+		cr := cw - bw*4
+		lay.CtrlCols = make([]int, 4)
+		for i := 0; i < 4; i++ {
+			lay.CtrlCols[i] = bw
+			if i < cr {
+				lay.CtrlCols[i]++
+			}
 		}
 	}
 
