@@ -94,28 +94,42 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// Just check it's an executable by running --help
 	// We skip this to keep it simple
 
-	// Step 5: replace binary
-	backupPath := exe + ".bak"
-	os.Remove(backupPath) // ignore error
-
-	if err := os.Rename(exe, backupPath); err != nil {
-		os.Remove(tmpFile)
-		return fmt.Errorf("backup failed: %w", err)
+	// Step 5: check if we can write to the target directory
+	binDir := filepath.Dir(exe)
+	dirWritable := false
+	testFile := filepath.Join(binDir, ".dot-write-test")
+	if err := os.WriteFile(testFile, []byte{}, 0644); err == nil {
+		os.Remove(testFile)
+		dirWritable = true
 	}
 
-	if err := os.Rename(tmpFile, exe); err != nil {
-		// restore backup
-		os.Rename(backupPath, exe)
-		os.Remove(tmpFile)
-		return fmt.Errorf("replace failed: %w", err)
+	if !dirWritable {
+		// Binary is in a protected directory (e.g., /usr/local/bin)
+		// Save new binary to temp and instruct user
+		fmt.Printf("  已下载到: %s\n", tmpFile)
+		fmt.Printf("\n需要管理员权限来更新 dot（位于 %s）:\n", binDir)
+		fmt.Printf("  sudo mv %s %s\n", tmpFile, exe)
+		fmt.Printf("  sudo chmod +x %s\n", exe)
+		fmt.Println("")
+	} else {
+		// Step 6: replace binary directly
+		backupPath := exe + ".bak"
+		os.Remove(backupPath)
+
+		if err := os.Rename(exe, backupPath); err != nil {
+			os.Remove(tmpFile)
+			return fmt.Errorf("backup failed: %w", err)
+		}
+		if err := os.Rename(tmpFile, exe); err != nil {
+			os.Rename(backupPath, exe) // restore backup
+			os.Remove(tmpFile)
+			return fmt.Errorf("replace failed: %w", err)
+		}
+		os.Remove(backupPath)
+		fmt.Printf("✓ dot 已更新: %s\n", exe)
 	}
 
-	// Clean up backup
-	os.Remove(backupPath)
-
-	fmt.Printf("✓ dot 已更新: %s\n", exe)
-
-	// Step 6: git pull latest config
+	// Step 7: git pull latest config
 	dfPath, err := DotfilesPath()
 	if err == nil {
 		fmt.Printf("→ 同步配置...\n")

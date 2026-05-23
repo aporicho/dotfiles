@@ -1,28 +1,39 @@
 # Dotfiles
 
-跨平台（macOS / Linux / WSL）开发环境配置，使用自建 `dot` CLI 工具管理，模块化按需加载。
+跨平台（macOS / Linux）开发环境配置，使用自建 `dot` CLI 工具管理，模块化按需加载。
+
+预编译二进制通过 GitHub Actions 自动构建发布，安装无需 Go 环境。
+
+[![Build dot CLI](https://github.com/aporicho/dotfiles/actions/workflows/dot-build.yml/badge.svg)](https://github.com/aporicho/dotfiles/actions/workflows/dot-build.yml)
 
 ## 一键安装
 
 ```bash
+# 交互式选择模块
 curl -fsSL https://raw.githubusercontent.com/aporicho/dotfiles/main/install.sh | bash
+
+# 全自动安装指定模块（推荐）
+curl -fsSL https://raw.githubusercontent.com/aporicho/dotfiles/main/install.sh | DOT_MODULES="kitty zsh" bash
+
+# 安装全部模块
+curl -fsSL https://raw.githubusercontent.com/aporicho/dotfiles/main/install.sh | DOT_MODULES="all" bash
 ```
 
-脚本会自动克隆仓库、构建 `dot` CLI、进入 TUI 选择要安装的模块。
+脚本自动克隆仓库 → 下载预编译 `dot` CLI → 安装模块，无需 Go 环境。
 
 ## dot CLI
 
 ```bash
-dot status                      # 查看所有模块状态
-dot pull                        # TUI 勾选安装/更新模块
-dot pull zsh kitty              # 直接安装指定模块
-dot pull --all                  # 安装全部模块
-dot push                        # 提交并推送本地变更
-dot push -m "fix font size"     # 自定义提交信息
+dot tui                          # 打开 TUI dashboard
+dot install                      # 交互式选择模块安装
+dot install kitty zsh            # 直接安装指定模块
+dot install --all                # 安装全部模块
+dot status                       # 查看所有模块状态
+dot update                       # 更新 dot CLI 本体 + 同步配置
+dot push                         # 提交并推送本地变更
 dot add ~/.config/starship.toml --name starship  # 纳入新配置
-dot remove kitty                # 卸载模块
-dot doctor                      # 检查符号链接健康
-dot clean                       # 清理备份文件
+dot remove kitty                 # 卸载模块
+dot doctor                       # 检查符号链接健康
 ```
 
 ## 模块
@@ -90,11 +101,11 @@ brew = ["starship"]
 # 改了配置后，推送到远端
 dot push
 
-# 在另一台机器上拉取更新
-dot pull
+# 在另一台机器上拉取更新（配置 + dot CLI 本体）
+dot update
 
 # 新机器只装需要的模块
-dot pull zsh nvim git bin
+dot install zsh nvim kitty
 
 # 检查配置是否正常
 dot doctor
