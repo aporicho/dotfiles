@@ -65,23 +65,18 @@ else
     ok "Go 已安装: $(go version)"
 fi
 
-# ── 3. 构建 dot CLI ──────────────────────
+# ── 3. 构建 dot CLI 到系统 PATH ──────────
 info "构建 dot CLI..."
-mkdir -p "$HOME/bin"
 cd "$DOTFILES_DIR/dot"
-go build -o "$HOME/bin/dot" .
-ok "dot CLI 已构建: $HOME/bin/dot"
-
-# ── 4. 永久添加 ~/bin 到 PATH ────────────
-if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.zshenv" 2>/dev/null; then
-    echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.zshenv"
-    export PATH="$HOME/bin:$PATH"
-    ok "已将 ~/bin 永久添加到 PATH（~/.zshenv）"
+if go build -o /usr/local/bin/dot . 2>/dev/null; then
+    ok "dot CLI 已安装: /usr/local/bin/dot"
 else
-    ok "~/bin 已在 PATH 中"
+    # macOS 上 /usr/local/bin 通常需要 sudo
+    sudo go build -o /usr/local/bin/dot .
+    ok "dot CLI 已安装: /usr/local/bin/dot"
 fi
 
-# ── 5. 安装模块 ──────────────────────────
+# ── 4. 安装模块 ──────────────────────────
 echo ""
 cd "$DOTFILES_DIR"
 
@@ -98,31 +93,5 @@ else
     dot pull
 fi
 
-# ── 6. 确保 dot 命令立即可用 ─────────────
-# 尝试创建全局 symlink（macOS /usr/local/bin 默认在 PATH 中）
-if command -v dot &>/dev/null; then
-    ok "dot 命令已可用"
-else
-    if [[ "$(uname)" == "Darwin" ]] && [ -w /usr/local/bin ] 2>/dev/null; then
-        ln -sf "$HOME/bin/dot" /usr/local/bin/dot
-        ok "已创建全局 symlink: /usr/local/bin/dot"
-    elif [[ "$(uname)" == "Darwin" ]] && command -v sudo &>/dev/null; then
-        sudo ln -sf "$HOME/bin/dot" /usr/local/bin/dot 2>/dev/null && \
-            ok "已创建全局 symlink: /usr/local/bin/dot" || \
-            warn "无法写入 /usr/local/bin（无权限）"
-    fi
-fi
-
 echo ""
 ok "全部完成！"
-echo ""
-echo -e "${YELLOW}━━━ 使用提示 ━━━${NC}"
-if command -v dot &>/dev/null; then
-    echo "  直接运行:  dot pull"
-else
-    echo "  完整路径:   $HOME/bin/dot pull"
-    echo "  或执行一下让 PATH 生效:"
-    echo "    source ~/.zshenv"
-    echo "  然后就能直接用:  dot pull"
-fi
-echo "  重启终端后也会自动生效（~/.zshenv）"
