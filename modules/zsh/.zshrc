@@ -86,3 +86,9 @@ eval "$(mark completion zsh)"
 
 # OpenClaw Completion
 source "/Users/aporicho/.openclaw/completions/openclaw.zsh"
+
+# >>> claudelike >>>
+# <<< claudelike <<<
+
+# opencode
+export PATH=/Users/aporicho/.opencode/bin:$PATH

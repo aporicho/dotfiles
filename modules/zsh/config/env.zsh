@@ -62,5 +62,17 @@ export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border'
 # Dotfiles bin directory (for custom scripts)
 export PATH="$HOME/dotfiles/bin:$PATH"
 
+# ============================================
+# Claude Code / Anthropic (DeepSeek)
+# ============================================
+export ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic
+export ANTHROPIC_AUTH_TOKEN=sk-6e1474ee4a1f44638a45428907a616e6
+export ANTHROPIC_MODEL=deepseek-v4-pro[1m]
+export ANTHROPIC_DEFAULT_OPUS_MODEL=deepseek-v4-pro[1m]
+export ANTHROPIC_DEFAULT_SONNET_MODEL=deepseek-v4-pro[1m]
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=deepseek-v4-flash
+export CLAUDE_CODE_SUBAGENT_MODEL=deepseek-v4-flash
+export CLAUDE_CODE_EFFORT_LEVEL=max
+
 # Secrets (decrypted by dot pull)
 [ -f ~/.zsh/secrets.env ] && source ~/.zsh/secrets.env
