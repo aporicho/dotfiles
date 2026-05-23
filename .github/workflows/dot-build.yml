@@ -1,0 +1,74 @@
+name: Build dot CLI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dot/**'
+      - '.github/workflows/dot-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            goarch: arm64
+            label: darwin-arm64
+          - os: macos-13
+            goarch: amd64
+            label: darwin-amd64
+          - os: ubuntu-latest
+            goarch: amd64
+            label: linux-amd64
+          - os: ubuntu-latest
+            goarch: arm64
+            label: linux-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: dot/go.sum
+
+      - name: Build binary
+        run: |
+          cd dot
+          GOARCH=${{ matrix.goarch }} go build -o dot-${{ matrix.label }} .
+          echo "Built: dot-${{ matrix.label }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dot-${{ matrix.label }}
+          path: dot/dot-${{ matrix.label }}
+          compression-level: 0
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: binaries
+          merge-multiple: true
+
+      - name: List binaries
+        run: ls -lh binaries/
+
+      - name: Upload to release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest
+          name: Latest Build
+          body: "Automated build from ${{ github.sha }}"
+          prerelease: true
+          allowUpdates: true
+          replacesArtifacts: true
+          artifacts: "binaries/*"
+          token: ${{ secrets.GITHUB_TOKEN }}

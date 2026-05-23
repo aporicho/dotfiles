@@ -16,6 +16,8 @@ set -euo pipefail
 
 DOTFILES_DIR="$HOME/dotfiles"
 REPO_URL="https://github.com/aporicho/dotfiles.git"
+DOT_BIN="/usr/local/bin/dot"
+RELEASE_BASE="https://github.com/aporicho/dotfiles/releases/download/latest"
 
 # 颜色
 RED='\033[0;31m'
@@ -45,52 +47,43 @@ else
 fi
 ok "dotfiles 就绪: $DOTFILES_DIR"
 
-# ── 2. 安装 Go（如果没有）─────────────────
-if ! command -v go &>/dev/null; then
-    info "安装 Go..."
-    if [[ "$(uname)" == "Darwin" ]]; then
-        if ! command -v brew &>/dev/null; then
-            info "先安装 Homebrew..."
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            if [[ -f /opt/homebrew/bin/brew ]]; then
-                eval "$(/opt/homebrew/bin/brew shellenv)"
-            fi
-        fi
-        brew install go
-    else
-        sudo apt-get update && sudo apt-get install -y golang
-    fi
-    ok "Go 安装完成"
-else
-    ok "Go 已安装: $(go version)"
-fi
+# ── 2. 下载预编译的 dot CLI ───────────────
+# 检测系统架构
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+case "$ARCH" in
+    x86_64|amd64) ARCH="amd64" ;;
+    aarch64|arm64) ARCH="arm64" ;;
+    *) fail "不支持的架构: $ARCH" ;;
+esac
 
-# ── 3. 构建 dot CLI 到系统 PATH ──────────
-info "构建 dot CLI..."
-cd "$DOTFILES_DIR/dot"
-if go build -o /usr/local/bin/dot . 2>/dev/null; then
-    ok "dot CLI 已安装: /usr/local/bin/dot"
-else
-    # macOS 上 /usr/local/bin 通常需要 sudo
-    sudo go build -o /usr/local/bin/dot .
-    ok "dot CLI 已安装: /usr/local/bin/dot"
-fi
+# macOS on Apple Silicon → arm64, Intel Mac → amd64
+PLATFORM="${OS}-${ARCH}"
+DOWNLOAD_URL="${RELEASE_BASE}/dot-${PLATFORM}"
 
-# ── 4. 安装模块 ──────────────────────────
+info "下载 dot CLI (${PLATFORM})..."
+if command -v sudo &>/dev/null && [ ! -w "$(dirname "$DOT_BIN")" ]; then
+    curl -fsSL "$DOWNLOAD_URL" -o /tmp/dot && sudo mv /tmp/dot "$DOT_BIN" && sudo chmod +x "$DOT_BIN"
+else
+    curl -fsSL "$DOWNLOAD_URL" -o "$DOT_BIN" && chmod +x "$DOT_BIN"
+fi
+ok "dot CLI 已安装: $DOT_BIN"
+
+# ── 3. 安装模块 ──────────────────────────
 echo ""
 cd "$DOTFILES_DIR"
 
 if [ "${DOT_MODULES:-}" = "all" ]; then
     info "安装全部模块..."
-    dot pull --all
+    dot install --all
 elif [ -n "${DOT_MODULES:-}" ]; then
     info "安装模块: $DOT_MODULES"
     # shellcheck disable=SC2086
-    dot pull $DOT_MODULES
+    dot install $DOT_MODULES
 else
     echo -e "${GREEN}  选择要安装的模块${NC}"
     echo ""
-    dot pull
+    dot install
 fi
 
 echo ""
