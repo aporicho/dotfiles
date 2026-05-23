@@ -16,15 +16,9 @@ jobs:
           - os: macos-latest
             goarch: arm64
             label: darwin-arm64
-          - os: macos-13
-            goarch: amd64
-            label: darwin-amd64
           - os: ubuntu-latest
             goarch: amd64
             label: linux-amd64
-          - os: ubuntu-latest
-            goarch: arm64
-            label: linux-arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
