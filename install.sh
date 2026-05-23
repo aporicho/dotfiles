@@ -98,5 +98,31 @@ else
     dot pull
 fi
 
+# ── 6. 确保 dot 命令立即可用 ─────────────
+# 尝试创建全局 symlink（macOS /usr/local/bin 默认在 PATH 中）
+if command -v dot &>/dev/null; then
+    ok "dot 命令已可用"
+else
+    if [[ "$(uname)" == "Darwin" ]] && [ -w /usr/local/bin ] 2>/dev/null; then
+        ln -sf "$HOME/bin/dot" /usr/local/bin/dot
+        ok "已创建全局 symlink: /usr/local/bin/dot"
+    elif [[ "$(uname)" == "Darwin" ]] && command -v sudo &>/dev/null; then
+        sudo ln -sf "$HOME/bin/dot" /usr/local/bin/dot 2>/dev/null && \
+            ok "已创建全局 symlink: /usr/local/bin/dot" || \
+            warn "无法写入 /usr/local/bin（无权限）"
+    fi
+fi
+
 echo ""
 ok "全部完成！"
+echo ""
+echo -e "${YELLOW}━━━ 使用提示 ━━━${NC}"
+if command -v dot &>/dev/null; then
+    echo "  直接运行:  dot pull"
+else
+    echo "  完整路径:   $HOME/bin/dot pull"
+    echo "  或执行一下让 PATH 生效:"
+    echo "    source ~/.zshenv"
+    echo "  然后就能直接用:  dot pull"
+fi
+echo "  重启终端后也会自动生效（~/.zshenv）"
