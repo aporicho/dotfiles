@@ -62,10 +62,41 @@ PLATFORM="${OS}-${ARCH}"
 DOWNLOAD_URL="${RELEASE_BASE}/dot-${PLATFORM}"
 
 info "下载 dot CLI (${PLATFORM})..."
-if command -v sudo &>/dev/null && [ ! -w "$(dirname "$DOT_BIN")" ]; then
-    curl -fsSL "$DOWNLOAD_URL" -o /tmp/dot && sudo mv /tmp/dot "$DOT_BIN" && sudo chmod +x "$DOT_BIN"
-else
-    curl -fsSL "$DOWNLOAD_URL" -o "$DOT_BIN" && chmod +x "$DOT_BIN"
+
+# 确保目标目录存在
+BIN_DIR="$(dirname "$DOT_BIN")"
+if [ ! -d "$BIN_DIR" ]; then
+    if command -v sudo &>/dev/null; then
+        sudo mkdir -p "$BIN_DIR"
+    else
+        mkdir -p "$BIN_DIR"
+    fi
+fi
+
+# 下载二进制（GitHub Releases 在某些网络下可能不通）
+if ! curl -fsSL --max-time 30 "$DOWNLOAD_URL" -o /tmp/dot 2>/dev/null; then
+    warn "GitHub Releases 下载失败，尝试从原始仓库下载..."
+    # 备用：直接通过 raw.githubusercontent.com 走不同 CDN
+    curl -fsSL --max-time 60 "https://github.com/aporicho/dotfiles/releases/download/latest/dot-${PLATFORM}" -o /tmp/dot || {
+        fail "下载失败，请检查网络或手动安装: $DOWNLOAD_URL"
+    }
+fi
+
+# 安装到系统 PATH
+if [ -w "$BIN_DIR" ]; then
+    mv /tmp/dot "$DOT_BIN" && chmod +x "$DOT_BIN"
+elif command -v sudo &>/dev/null; then
+    # 非交互环境用 sudo -S 从 stdin 读密码（如果设了密码）
+    if sudo -n true 2>/dev/null; then
+        # sudo 不需要密码（NOPASSWD）
+        sudo mv /tmp/dot "$DOT_BIN" && sudo chmod +x "$DOT_BIN"
+    else
+        # sudo 需要密码 — 提示用户手动执行
+        warn "需要管理员权限，请手动执行:"
+        echo "  sudo mv /tmp/dot $DOT_BIN"
+        echo "  sudo chmod +x $DOT_BIN"
+        echo "  或者设置 sudo NOPASSWD"
+    fi
 fi
 ok "dot CLI 已安装: $DOT_BIN"
 
